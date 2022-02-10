@@ -6,20 +6,20 @@
 </p>
 
 <p align = center>
-	<a href="https://github.com/wsarce/tkvideo/graphs/contributors">
-		<img src="https://img.shields.io/github/contributors/wsarce/tkvideo.svg?style=flat-square" alt="Contributors" />
+	<a href="https://github.com/wsarce/tkVideoUtils/graphs/contributors">
+		<img src="https://img.shields.io/github/contributors/wsarce/tkVideoUtils.svg?style=flat-square" alt="Contributors" />
 	</a>
-	<a href="https://github.com/wsarce/tkvideo/network/members">
-		<img src="https://img.shields.io/github/forks/wsarce/tkvideo.svg?style=flat-square" alt="Forks" />
+	<a href="https://github.com/wsarce/tkVideoUtils/network/members">
+		<img src="https://img.shields.io/github/forks/wsarce/tkVideoUtils.svg?style=flat-square" alt="Forks" />
 	</a>
-	<a href="https://github.com/wsarce/tkvideo/stargazers">
-		<img src="https://img.shields.io/github/stars/wsarce/tkvideo.svg?style=flat-squarem/huskeee/tkvideo/network/members" alt="Stargazers" />
+	<a href="https://github.com/wsarce/tkVideoUtils/stargazers">
+		<img src="https://img.shields.io/github/stars/wsarce/tkVideoUtils.svg?style=flat-squarem/huskeee/tkvideo/network/members" alt="Stargazers" />
 	</a>
-	<a href="https://github.com/wsarce/tkvideo/issues">
-		<img src="https://img.shields.io/github/issues/wsarce/tkvideo.svg?style=flat-square" alt="Issues" />
+	<a href="https://github.com/wsarce/tkVideoUtils/issues">
+		<img src="https://img.shields.io/github/issues/wsarce/tkVideoUtils.svg?style=flat-square" alt="Issues" />
 	</a>
-	<a href="https://github.com/wsarce/tkvideo/blob/master/LICENSE">
-		<img src="https://img.shields.io/github/license/wsarce/tkvideo.svg?style=flat-square" alt="MIT License" />
+	<a href="https://github.com/wsarce/tkVideoUtils/blob/master/LICENSE">
+		<img src="https://img.shields.io/github/license/wsarce/tkVideoUtils.svg?style=flat-square" alt="MIT License" />
 	</a>
 </p>
 
