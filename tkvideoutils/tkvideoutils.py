@@ -3,8 +3,6 @@ Pillow and imageio
 
 Copyright © 2022 Walker Arce (wsarcera@gmail.com)
 Released under the terms of the MIT license (https://opensource.org/licenses/MIT) as described in LICENSE.md
-
-TODO: Break out webcam recording and display into a separate class
 """
 import time
 try:
