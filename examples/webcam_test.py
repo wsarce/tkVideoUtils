@@ -24,10 +24,11 @@ if video_sources:
     if video_path:
         # read video to display on label
         player = VideoRecorder(source=video_sources[0], path=video_path, fps=30, label=video_label, size=(700, 500))
+        player.start_playback()
     else:
         messagebox.showwarning("Select Video File", "Please retry and select a video file.")
         sys.exit(1)
-    button.config(command=player.record)
+    button.config(command=player.start_recording)
     root.mainloop()
 else:
     print("No video sources found!")

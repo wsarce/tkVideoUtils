@@ -4,10 +4,9 @@ with open('README.md') as f:
     readme = f.read()
 
 setup(name='tkVideoPlayer',
-      version='0.2.8',
-      description='Python module for playing videos (without sound) inside tkinter Label widget using Pillow and '
-                  'imageio, including media playback control, slider, and fps aware buffering.  Derivative of tkVideo'
-                  'by huskeee',
+      version='0.3.8',
+      description='Python module for playing and recording videos (without sound) inside tkinter Label widget '
+                  'using Pillow and imageio, including media playback control, slider, and fps aware buffering.',
       long_description=readme,
       long_description_content_type="text/markdown",
       classifiers=[
@@ -15,12 +14,12 @@ setup(name='tkVideoPlayer',
           'Programming Language :: Python :: 3.8',
           'Topic :: Multimedia :: Video :: Display'
       ],
-      keywords='tkvideplayer tkinter video display labeli pillow imageio huskeee wsarce',
+      keywords='tkVideoUtils tkinter video display labeli pillow imageio wsarce',
       url='https://github.com/wsarce/tkvideo',
       author='Walker Arce (wsarce)',
       author_email='wsarcera@gmail.com',
       license='MIT',
-      packages=['tkvideoplayer'],
+      packages=['tkvideoutils'],
       install_requires=[
           'imageio',
           'imageio-ffmpeg',

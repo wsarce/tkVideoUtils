@@ -21,11 +21,10 @@ class VideoRecorder:
         self.frame_duration = float(1 / self.fps)
         self.label = label
         self.output_path = path
-        self.input_source = source[0]
-        self.cam = imageio.get_reader(f'<video{source[0]}>', fps=fps)
-        self.writer = imageio.get_writer(path, fps=fps)
+        self.source = source
         self.thread = None
         self.recording = False
+        self.playing = False
         if keep_ratio:
             self.aspect_ratio = float(source[1][1]) / float(source[1][0])
             self.size = (size[0], int(size[0] / self.aspect_ratio))
@@ -45,20 +44,28 @@ class VideoRecorder:
         return sources
 
     def recording_thread(self):
-        while self.recording:
+        while self.playing:
             im = self.cam.get_next_data()
-            self.writer.append_data(im)
+            if self.recording:
+                self.writer.append_data(im)
             if self.label.winfo_viewable():
                 frame_image = ImageTk.PhotoImage(Image.fromarray(im).resize(self.size))
                 self.label.config(image=frame_image)
                 self.label.image = frame_image
             time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
+        self.writer.close()
+        self.cam.close()
+
+    def start_recording(self):
+        self.recording = True
 
     def stop_recording(self):
         self.recording = False
 
-    def record(self):
-        self.recording = True
+    def start_playback(self):
+        self.playing = True
+        self.cam = imageio.get_reader(f'<video{self.source[0]}>', fps=self.fps)
+        self.writer = imageio.get_writer(self.output_path, fps=self.fps)
         self.thread = threading.Thread(target=self.recording_thread)
         self.thread.daemon = 1
         self.thread.start()
