@@ -24,7 +24,8 @@ setup(name='tkVideoPlayer',
       install_requires=[
           'imageio',
           'imageio-ffmpeg',
-          'pillow'
+          'pillow',
+          'opencv-python'
       ],
       include_package_data=True,
       zip_safe=False

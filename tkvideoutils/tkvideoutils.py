@@ -91,12 +91,9 @@ class VideoPlayer:
         self.skip_size = skip_size_s
         self.frame_data = imageio.get_reader(path)
         meta_data = cv2.VideoCapture(path)
-        # self.meta_data = self.frame_data.get_meta_data()
         self.fps = meta_data.get(cv2.CAP_PROP_FPS)
         self.frame_duration = float(1 / self.fps)
         self.nframes = int(meta_data.get(cv2.CAP_PROP_FRAME_COUNT))
-        # if self.nframes == float("inf"):
-        #     self.nframes = int(float(self.fps) * float(self.meta_data['duration']))
         self.current_frame = 0
         if keep_ratio:
             temp = self.frame_data._get_data(0)[0].shape
@@ -170,7 +167,6 @@ class VideoPlayer:
         i = int(frame)
         self.playing = True
         while i < n:
-            # start = time.perf_counter_ns()
             if not self.playing:
                 break
             try:
@@ -187,8 +183,8 @@ class VideoPlayer:
                 raise
             if self.label.winfo_viewable():
                 frame_image = ImageTk.PhotoImage(Image.fromarray(im).resize(self.size))
-                label.config(image=frame_image)
-                label.image = frame_image
+                self.label.config(image=frame_image)
+                self.label.image = frame_image
                 if self.slider_var:
                     self.slider_var.set(i)
             if self.skip_forward:
@@ -198,11 +194,6 @@ class VideoPlayer:
                 i += int(self.skip_size * self.fps)
                 self.skip_backward = False
             i += 1
-            # end = time.perf_counter_ns()
-            # processing_time = float(end - start) / float(1000000000)
-            # print(processing_time)
-            # time.sleep((self.frame_duration - processing_time) - time.monotonic() %
-            #            (self.frame_duration - processing_time))
             time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
         self.playing = False
         if self.current_frame > self.nframes:
