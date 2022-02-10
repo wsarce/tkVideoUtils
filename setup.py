@@ -3,7 +3,7 @@ from setuptools import setup
 with open('README.md') as f:
     readme = f.read()
 
-setup(name='tkVideoPlayer',
+setup(name='tkVideoUtils',
       version='0.3.8',
       description='Python module for playing and recording videos (without sound) inside tkinter Label widget '
                   'using Pillow and imageio, including media playback control, slider, and fps aware buffering.',
