@@ -25,6 +25,7 @@ class VideoRecorder:
         self.thread = None
         self.recording = False
         self.playing = False
+        self.current_frame = 0
         if keep_ratio:
             self.aspect_ratio = float(source[1][1]) / float(source[1][0])
             self.size = (size[0], int(size[0] / self.aspect_ratio))
@@ -46,6 +47,7 @@ class VideoRecorder:
     def recording_thread(self):
         while self.playing:
             im = self.cam.get_next_data()
+            self.current_frame += 1
             if self.recording:
                 self.writer.append_data(im)
             if self.label.winfo_viewable():
@@ -64,6 +66,7 @@ class VideoRecorder:
 
     def start_playback(self):
         self.playing = True
+        self.current_frame = 0
         self.cam = imageio.get_reader(f'<video{self.source[0]}>', fps=self.fps)
         self.writer = imageio.get_writer(self.output_path, fps=self.fps)
         self.thread = threading.Thread(target=self.recording_thread)
