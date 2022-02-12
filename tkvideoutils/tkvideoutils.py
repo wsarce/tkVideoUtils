@@ -4,6 +4,9 @@ Pillow and imageio
 Copyright © 2022 Walker Arce (wsarcera@gmail.com)
 Released under the terms of the MIT license (https://opensource.org/licenses/MIT) as described in LICENSE.md
 """
+import os
+import pathlib
+import shutil
 import time
 try:
     import Tkinter as tk  # for Python2 (although it has already reached EOL)
@@ -58,7 +61,12 @@ class VideoRecorder:
         self.writer.close()
         self.cam.close()
 
-    def start_recording(self):
+    def start_recording(self, output_path=None):
+        if output_path:
+            self.output_path = output_path
+            self.writer = imageio.get_writer(output_path, fps=self.fps)
+        else:
+            self.writer = imageio.get_writer(self.output_path, fps=self.fps)
         self.recording = True
 
     def stop_recording(self):
@@ -68,7 +76,6 @@ class VideoRecorder:
         self.playing = True
         self.current_frame = 0
         self.cam = imageio.get_reader(f'<video{self.source[0]}>', fps=self.fps)
-        self.writer = imageio.get_writer(self.output_path, fps=self.fps)
         self.thread = threading.Thread(target=self.recording_thread)
         self.thread.daemon = 1
         self.thread.start()
@@ -76,21 +83,8 @@ class VideoRecorder:
 
 class VideoPlayer:
     """
-        Main class of tkVideo. Handles loading and playing
-        the video inside the selected label.
 
-        :keyword path:
-            Path of video file
-        :keyword label:
-            Name of label that will house the player
-        :param loop:
-            If equal to 0, the video only plays once,
-            if not it plays in an infinite loop (default 0)
-        :param size:
-            Changes the video's dimensions (2-tuple,
-            default is 640x360)
     """
-
     def __init__(self, path, label, loop=False, size=(640, 360), play_button=None, play_image=None, pause_image=None,
                  slider=None, slider_var=None, keep_ratio=False, skip_size_s=1):
         self.path = path
@@ -124,17 +118,23 @@ class VideoPlayer:
             self.play_button.config(image=self.play_image, command=self.toggle_video)
         self.load_frame(1)
 
-    def toggle_video(self):
+    def play_video(self):
         if not self.playing:
             self.play()
-            self.playing = True
             if self.play_button:
                 self.play_button.config(image=self.pause_image)
-        else:
+
+    def pause_video(self):
+        if self.playing:
             self.stop_playing()
-            self.playing = False
             if self.play_button:
                 self.play_button.config(image=self.play_image)
+
+    def toggle_video(self):
+        if not self.playing:
+            self.play_video()
+        else:
+            self.pause_video()
 
     def slider_frame_load(self, value):
         self.load_frame(value)
@@ -216,9 +216,17 @@ class VideoPlayer:
             Creates and starts a thread as a daemon that plays the video by rapidly going through
             the video's frames.
         """
+        self.playing = True
         if self.current_frame == self.nframes:
             self.current_frame = 0
         thread = threading.Thread(target=self.iter_data_index,
                                   args=(self.path, self.label, self.current_frame, self.slider))
         thread.daemon = 1
         thread.start()
+
+
+def cp_rename(src, dst, name):
+    shutil.copy2(src, dst)
+    dst_file = os.path.join(dst, pathlib.Path(src).name)
+    new_dst_file = os.path.join(dst, name + pathlib.Path(src).suffix)
+    os.rename(dst_file, new_dst_file)
