@@ -50,9 +50,9 @@ class VideoRecorder:
     def recording_thread(self):
         while self.playing:
             im = self.cam.get_next_data()
-            self.current_frame += 1
             if self.recording:
                 self.writer.append_data(im)
+                self.current_frame += 1
             if self.label.winfo_viewable():
                 frame_image = ImageTk.PhotoImage(Image.fromarray(im).resize(self.size))
                 self.label.config(image=frame_image)
