@@ -72,6 +72,9 @@ class VideoRecorder:
     def stop_recording(self):
         self.recording = False
 
+    def stop_playback(self):
+        self.playing = False
+
     def start_playback(self):
         self.playing = True
         self.current_frame = 0
