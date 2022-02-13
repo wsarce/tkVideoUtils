@@ -28,6 +28,8 @@ class VideoRecorder:
         self.thread = None
         self.recording = False
         self.playing = False
+        self.cam = None
+        self.writer = None
         self.current_frame = 0
         if keep_ratio:
             self.aspect_ratio = float(source[1][1]) / float(source[1][0])
@@ -58,7 +60,8 @@ class VideoRecorder:
                 self.label.config(image=frame_image)
                 self.label.image = frame_image
             time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
-        self.writer.close()
+        if self.writer:
+            self.writer.close()
         self.cam.close()
 
     def start_recording(self, output_path=None):
