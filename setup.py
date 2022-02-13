@@ -4,7 +4,7 @@ with open('README.md') as f:
     readme = f.read()
 
 setup(name='tkVideoUtils',
-      version='0.4.17',
+      version='0.4.18',
       description='Python module for playing and recording videos (without sound) inside tkinter Label widget '
                   'using Pillow and imageio, including media playback control, slider, and fps aware buffering.',
       long_description=readme,
@@ -14,7 +14,7 @@ setup(name='tkVideoUtils',
           'Programming Language :: Python :: 3.8',
           'Topic :: Multimedia :: Video :: Display'
       ],
-      keywords='tkVideoUtils tkinter video display labeli pillow imageio wsarce',
+      keywords='tkVideoUtils tkinter video webcam display label pillow imageio wsarce',
       url='https://github.com/wsarce/tkvideo',
       author='Walker Arce (wsarce)',
       author_email='wsarcera@gmail.com',
