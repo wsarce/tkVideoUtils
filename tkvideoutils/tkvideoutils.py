@@ -113,6 +113,7 @@ class VideoPlayer:
             self.size = size
         self.slider = slider
         self.slider_var = slider_var
+        self.override_slider = override_slider
         if self.slider:
             self.slider.config(from_=1, to=self.nframes)
             self.slider.config(length=size[0])
@@ -204,8 +205,13 @@ class VideoPlayer:
                 frame_image = ImageTk.PhotoImage(Image.fromarray(im).resize(self.size))
                 self.label.config(image=frame_image)
                 self.label.image = frame_image
-                if self.slider_var:
-                    self.slider_var.set(i)
+                if self.override_slider:
+                    if self.slider:
+                        # Trigger callback each time a frame is loaded
+                        self.slider.set(i)
+                else:
+                    if self.slider_var:
+                        self.slider_var.set(i)
             if self.skip_forward:
                 i += int(self.skip_size * self.fps)
                 self.skip_forward = False
