@@ -92,7 +92,7 @@ class VideoPlayer:
 
     """
     def __init__(self, path, label, loop=False, size=(640, 360), play_button=None, play_image=None, pause_image=None,
-                 slider=None, slider_var=None, keep_ratio=False, skip_size_s=1):
+                 slider=None, slider_var=None, keep_ratio=False, skip_size_s=1, override_slider=False):
         self.path = path
         self.label = label
         self.loop = loop
@@ -112,9 +112,12 @@ class VideoPlayer:
         else:
             self.size = size
         self.slider = slider
+        self.slider_var = slider_var
         if self.slider:
             self.slider.config(from_=1, to=self.nframes)
-            self.slider.config(length=size[0], command=self.slider_frame_load)
+            self.slider.config(length=size[0])
+            if not override_slider:
+                self.slider.config(command=self.slider_frame_load)
             self.slider_var = slider_var
             self.slider_var.set(1)
         self.play_button = play_button
