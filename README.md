@@ -30,14 +30,16 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-tkVideoUtils is a Python module for playing and recording videos in GUIs created with tkinter.
+tkVideoUtils is a Python module for playing and recording videos in GUIs created with tkinter.  Using imageio-ffmpeg, webcams can be indexed and streamed in a tkinter Label.  They can also be recorded (in their original resolution) by calling the `start_recording()` function!  This project was heavily inspired by [huskeee's tkvideo library](https://github.com/huskeee/tkvideo), check their project out!
 
 
 ### Built With
 
 * [tkinter (Python built-in)](https://docs.python.org/3/library/tkinter.html)
 * [imageio](https://imageio.github.io)
+* [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg)
 * [Pillow](https://pypi.org/project/Pillow/)
+* [opencv-python](https://pypi.org/project/opencv-python/)
 
 
 ## Installation
@@ -71,49 +73,91 @@ This will create a shim between your code and the module binaries that gets upda
 
 
 <!-- USAGE EXAMPLES -->
-## Usage
-
-* Import tkinter and tkvideo
-* Create `Tk()` parent and the label you'd like to use
-* Create `tkvideo` object with its parameters (video file path, label name, whether to loop the video or not and size of the video)
-* Start the player thread with `<player_name>.play()`
-* Start the Tk main loop
-
-Example code:
+# Playing a Video in a Label
 
 ```py
 from tkinter import *
-from tkvideoutils import tkvideoplayer
+from tkvideoutils import VideoPlayer
 from tkinter import filedialog, messagebox
 
-# create instance of window
-root = Tk()
-# set window title
-root.title('Video Player')
-# load images
-pause_image = PhotoImage(file='pause.png')
-play_image = PhotoImage(file='play.png')
-# create user interface
-button = Button(root, image=play_image)
-video_label = Label(root)
-video_path = filedialog.askopenfilename()
-slider_var = IntVar(root)
-slider = Scale(root, orient=HORIZONTAL, variable=slider_var)
-# place elements
-video_label.pack()
-button.pack()
-slider.pack()
+if __name__ == '__main__':
+    # create instance of window
+    root = Tk()
+    # set window title
+    root.title('Video Player')
+    # load images
+    pause_image = PhotoImage(file='pause.png')
+    play_image = PhotoImage(file='play.png')
+    skip_backward = PhotoImage(file='skip_backward.png')
+    skip_forward = PhotoImage(file='skip_forward.png')
+    # create user interface
+    button = Button(root, image=play_image)
+    forward_button = Button(root, image=skip_forward)
+    backward_button = Button(root, image=skip_backward)
+    video_label = Label(root)
+    video_path = filedialog.askopenfilename()
+    slider_var = IntVar(root)
+    slider = Scale(root, orient=HORIZONTAL, variable=slider_var)
+    # place elements
+    video_label.pack()
+    button.pack()
+    forward_button.pack()
+    backward_button.pack()
+    slider.pack()
 
-if video_path:
-    # read video to display on label
-    player = tkvideoplayer(video_path, video_label,
-                           loop=False, size=(700, 500),
-                           play_button=button, play_image=play_image, pause_image=pause_image,
-                           slider=slider, slider_var=slider_var)
-else:
-    messagebox.showwarning("Select Video File", "Please retry and select a video file.")
-    sys.exit(1)
-root.mainloop()
+    if video_path:
+        # read video to display on label
+        player = VideoPlayer(video_path, video_label,
+                             loop=False, size=(700, 500),
+                             play_button=button, play_image=play_image, pause_image=pause_image,
+                             slider=slider, slider_var=slider_var)
+    else:
+        messagebox.showwarning("Select Video File", "Please retry and select a video file.")
+        sys.exit(1)
+    forward_button.config(command=player.skip_video_forward)
+    backward_button.config(command=player.skip_video_backward)
+    root.mainloop()
+```
+
+# Playing and Recording a Webcam in a Label
+
+```py
+from tkinter import *
+from tkvideoutils import VideoRecorder
+from tkinter import messagebox
+
+
+if __name__ == '__main__':
+    # create instance of window
+    root = Tk()
+    # set window title
+    root.title('Video Player')
+    # load images
+    pause_image = PhotoImage(file='pause.png')
+    play_image = PhotoImage(file='play.png')
+    # create user interface
+    button = Button(root, image=play_image)
+    video_label = Label(root)
+    video_path = 'test.mp4'
+    # place elements
+    video_label.pack()
+    button.pack()
+    # Get existing video sources
+    video_sources = VideoRecorder.get_sources()
+
+    if video_sources:
+        if video_path:
+            # read video to display on label
+            player = VideoRecorder(source=video_sources[0], path=video_path, fps=30, label=video_label, size=(700, 500))
+            player.start_playback()
+        else:
+            messagebox.showwarning("Select Video File", "Please retry and select a video file.")
+            sys.exit(1)
+        button.config(command=player.start_recording)
+        root.mainloop()
+    else:
+        print("No video sources found!")
+
 ```
 
 ## Issues / suggestions
