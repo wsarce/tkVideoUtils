@@ -164,6 +164,11 @@ if __name__ == '__main__':
 
 Have a problem that needs to be solved or a suggestion to make? See the [issues](https://github.com/wsarce/tkVideoUtils/issues) page.
 
+## Notes on Freezing
+
+If you want to freeze your Python scripts that reference tkVideoUtils, there are some general notes to keep in mind:
+- Due to the use of ImageIO, the lazy import error causes frozen Python scripts to fail to start or fail to execute the imageio codepaths.  This can make it look like imageio-ffmpeg is failing with a backend issue.  To circumvent this, follow this [answer](https://stackoverflow.com/a/70214003).  This answer says to overwrite your imageio folder in your exe output directory with the imageio folder from your virtual environment (`venv\Lib\site-packages\imageio`).  I can verify that this works.
+- I prefer copying the ffmpeg exe version that is packaged with imageio-ffmpeg into your exe directory in a known folder and updating `os.environ['IMAGEIO_FFMPEG_EXE']` with that directory.  This ensures a known path.
 
 ## License
 
