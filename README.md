@@ -73,7 +73,8 @@ This will create a shim between your code and the module binaries that gets upda
 
 
 <!-- USAGE EXAMPLES -->
-# Playing a Video in a Label
+## Usage
+### Playing a Video in a Label
 
 ```py
 from tkinter import *
@@ -119,7 +120,7 @@ if __name__ == '__main__':
     root.mainloop()
 ```
 
-# Playing and Recording a Webcam in a Label
+### Playing and Recording a Webcam in a Label
 
 ```py
 from tkinter import *
@@ -159,8 +160,7 @@ if __name__ == '__main__':
         print("No video sources found!")
 
 ```
-
-## Issues / suggestions
+## Issues / Suggestions
 
 Have a problem that needs to be solved or a suggestion to make? See the [issues](https://github.com/wsarce/tkVideoUtils/issues) page.
 
@@ -173,8 +173,6 @@ If you want to freeze your Python scripts that reference tkVideoUtils, there are
 ## License
 
 Distributed under the MIT License. See `LICENSE` for more information.
-
-
 
 ## Contact
 
