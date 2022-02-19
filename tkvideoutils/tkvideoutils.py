@@ -19,7 +19,19 @@ from PIL import Image, ImageTk
 
 
 class VideoRecorder:
+    """
+    Class that handles the recording and streaming of video
+    """
     def __init__(self, source, path, fps, label, size=(640, 360), keep_ratio=True):
+        """
+        Streams, records, and handles webcam feeds
+        :param source: tuple: Use VideoRecorder.get_sources() to get compatible sources
+        :param path: path-like: Output save path of the recorded video
+        :param fps: float or int: The recording frames per second
+        :param label: Tk Label: The Label that will be used to display the video
+        :param size: tuple: The height and width of the video on the Label
+        :param keep_ratio: bool: If true, the aspect ratio is kept for the video
+        """
         self.fps = fps
         self.frame_duration = float(1 / self.fps)
         self.label = label
@@ -39,6 +51,11 @@ class VideoRecorder:
 
     @staticmethod
     def get_sources():
+        """
+        Polls webcam sources and find their video resolution, i.e., (0, (780, 420)).  Passing one of these sources to
+        the VideoRecorder object will allow it to use that camera.
+        :return: List of tuples containing found sources and their resolution.
+        """
         sources = []
         for i in range(0, 10):
             try:
@@ -50,6 +67,11 @@ class VideoRecorder:
         return sources
 
     def recording_thread(self):
+        """
+        Thread that plays and records video in the background.  Will only update the image on the Label is the Label
+        is currently being viewed.
+        :return: None
+        """
         while self.playing:
             im = self.cam.get_next_data()
             if self.recording:
@@ -65,6 +87,11 @@ class VideoRecorder:
         self.cam.close()
 
     def start_recording(self, output_path=None):
+        """
+        Start webcam recording, if an output path is provided then the original output path is overwritten.
+        :param output_path: path-like: Desired absolute filepath for the recorded video
+        :return: None
+        """
         if output_path:
             self.output_path = output_path
             self.writer = imageio.get_writer(output_path, fps=self.fps)
@@ -73,12 +100,24 @@ class VideoRecorder:
         self.recording = True
 
     def stop_recording(self):
+        """
+        Sets the recording variable to False, which will stap the saving of frames to the output file.
+        :return: None
+        """
         self.recording = False
 
     def stop_playback(self):
+        """
+        Stops the playback for the VideoRecorder.  Thread is terminated.
+        :return: None
+        """
         self.playing = False
 
     def start_playback(self):
+        """
+        Setup webcam source and start the background thread.  The video will start streaming to the Label.
+        :return: None
+        """
         self.playing = True
         self.current_frame = 0
         self.cam = imageio.get_reader(f'<video{self.source[0]}>', fps=self.fps)
@@ -89,13 +128,26 @@ class VideoRecorder:
 
 class VideoPlayer:
     """
-
+    Class that handles the streaming of a video file from the filesystem to a Label.
     """
-    def __init__(self, path, label, loop=False, size=(640, 360), play_button=None, play_image=None, pause_image=None,
+    def __init__(self, path, label, size=(640, 360), play_button=None, play_image=None, pause_image=None,
                  slider=None, slider_var=None, keep_ratio=False, skip_size_s=1, override_slider=False):
+        """
+        Streams a video on the filesystem to a tkinter Label.
+        :param path: path-like: Absolute path to the video file to be streamed
+        :param label: Tk Label: The Label that will stream the video
+        :param size: tuple: The size of the video on the Tk Label.
+        :param play_button: Tk Button: Pass in a Button that will be wired up to control the play/pause of the video
+        :param play_image: PhotoImage: The image that will be on the play_button if the video is paused
+        :param pause_image: PhotoImage: The image that will be on the play_button if the video is playing
+        :param slider: Tk Slider: Pass in a Slider that will be wired up to control the loaded frame
+        :param slider_var: Tk IntVar: Control variable that can be used to monitor the frame index
+        :param keep_ratio: bool: If True, the source aspect ratio will be kept
+        :param skip_size_s: int: The number of seconds the video should skip when skipped forward or backward
+        :param override_slider: bool: Set to true if you want to configure an external callback for the Slider
+        """
         self.path = path
         self.label = label
-        self.loop = loop
         self.playing = False
         self.skip_forward, self.skip_backward = False, False
         self.skip_size = skip_size_s
@@ -129,27 +181,49 @@ class VideoPlayer:
         self.load_frame(1)
 
     def play_video(self):
+        """
+        If the video is paused, play it.  If the play button exists, change the image on it.
+        :return:
+        """
         if not self.playing:
             self.play()
             if self.play_button:
                 self.play_button.config(image=self.pause_image)
 
     def pause_video(self):
+        """
+        If the video is playing, pause it.  If the play button exists, change the image on it.
+        :return: None
+        """
         if self.playing:
             self.stop_playing()
             if self.play_button:
                 self.play_button.config(image=self.play_image)
 
     def toggle_video(self):
+        """
+        If the video is playing, pause it, if the video is paused, play it.
+        :return: None
+        """
         if not self.playing:
             self.play_video()
         else:
             self.pause_video()
 
     def slider_frame_load(self, value):
+        """
+        Callback for the slider to load a frame
+        :param value: str: The slider value
+        :return: None
+        """
         self.load_frame(value)
 
     def load_frame(self, frame):
+        """
+        Loads the selected frame index into the Tk Label and sets the necessary control variables.
+        :param frame: int: The frame to load.
+        :return: None
+        """
         image, met = self.frame_data._get_data(int(frame) - 1)
         frame_image = ImageTk.PhotoImage(Image.fromarray(image).resize(self.size))
         self.label.config(image=frame_image)
@@ -159,10 +233,19 @@ class VideoPlayer:
             self.slider.set(self.current_frame)
 
     def stop_playing(self):
+        """
+        Stop the playback of the video, thread will terminate.
+        :return: None
+        """
         if self.playing:
             self.playing = False
 
     def skip_video_forward(self):
+        """
+        Skips the video feed forward by either telling the Thread to do it, or by changing the current frame and loading
+        the frame.
+        :return: None
+        """
         if self.playing:
             self.skip_forward = True
         else:
@@ -170,21 +253,26 @@ class VideoPlayer:
             self.load_frame(self.current_frame)
 
     def skip_video_backward(self):
+        """
+        Skips the video feed backward by either telling the Thread to do it, or by changing the current frame and loading
+        the frame.
+        :return: None
+        """
         if self.playing:
             self.skip_backward = True
         else:
             self.current_frame = self.current_frame - int(self.skip_size * self.fps)
             self.load_frame(self.current_frame)
 
-    def iter_data_index(self, path, label, frame, slider):
-        """ iter_data()
-        Iterate over all images in the series. (Note: you can also
-        iterate over the reader object.)
+    def playing_thread(self):
         """
-        frame_data = imageio.get_reader(path)
+        Thread that will stream the video file to a Label at the source frame rate.
+        :return: None
+        """
+        frame_data = imageio.get_reader(self.path)
         frame_data._checkClosed()
         n = frame_data.get_length()
-        i = int(frame)
+        i = int(self.current_frame)
         self.playing = True
         while i < n:
             if not self.playing:
@@ -228,19 +316,25 @@ class VideoPlayer:
 
     def play(self):
         """
-            Creates and starts a thread as a daemon that plays the video by rapidly going through
-            the video's frames.
+        Creates a thread that plays the video frames onto the Label at the source FPS.
+        :return: None
         """
         self.playing = True
         if self.current_frame == self.nframes:
             self.current_frame = 0
-        thread = threading.Thread(target=self.iter_data_index,
-                                  args=(self.path, self.label, self.current_frame, self.slider))
+        thread = threading.Thread(target=self.playing_thread)
         thread.daemon = 1
         thread.start()
 
 
 def cp_rename(src, dst, name):
+    """
+    Small utility for handling recorded videos.  Copy and rename a file on the filesystem.
+    :param src: path-like: Absolute filepath to the source video
+    :param dst: path-like: Absolute filepath to the folder to move the src to
+    :param name: str: New name for file being moved
+    :return:
+    """
     shutil.copy2(src, dst)
     dst_file = os.path.join(dst, pathlib.Path(src).name)
     new_dst_file = os.path.join(dst, name + pathlib.Path(src).suffix)
