@@ -73,15 +73,18 @@ class VideoRecorder:
         :return: None
         """
         while self.playing:
-            im = self.cam.get_next_data()
-            if self.recording:
-                self.writer.append_data(im)
-                self.current_frame += 1
-            if self.label.winfo_viewable():
-                frame_image = ImageTk.PhotoImage(Image.fromarray(im).resize(self.size))
-                self.label.config(image=frame_image)
-                self.label.image = frame_image
-            time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
+            try:
+                im = self.cam.get_next_data()
+                if self.recording:
+                    self.writer.append_data(im)
+                    self.current_frame += 1
+                if self.label.winfo_viewable():
+                    frame_image = ImageTk.PhotoImage(Image.fromarray(im).resize(self.size))
+                    self.label.config(image=frame_image)
+                    self.label.image = frame_image
+                time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
+            except Exception:
+                continue
         if self.writer:
             self.writer.close()
         self.cam.close()
