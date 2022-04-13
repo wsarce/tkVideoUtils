@@ -307,7 +307,7 @@ class VideoPlayer:
                 i += int(self.skip_size * self.fps)
                 self.skip_forward = False
             elif self.skip_backward:
-                i += int(self.skip_size * self.fps)
+                i -= int(self.skip_size * self.fps)
                 self.skip_backward = False
             i += 1
             time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
