@@ -8,6 +8,10 @@ import os
 import pathlib
 import shutil
 import time
+from tkinter import ttk
+
+from ttkwidgets import TickScale
+
 try:
     import Tkinter as tk  # for Python2 (although it has already reached EOL)
 except ImportError:
@@ -22,6 +26,7 @@ class VideoRecorder:
     """
     Class that handles the recording and streaming of video
     """
+
     def __init__(self, source, path, fps, label, size=(640, 360), keep_ratio=True):
         """
         Streams, records, and handles webcam feeds
@@ -133,7 +138,8 @@ class VideoPlayer:
     """
     Class that handles the streaming of a video file from the filesystem to a Label.
     """
-    def __init__(self, path, label, size=(640, 360), play_button=None, play_image=None, pause_image=None,
+
+    def __init__(self, root, path, label, size=(640, 360), play_button=None, play_image=None, pause_image=None,
                  slider=None, slider_var=None, keep_ratio=False, skip_size_s=1, override_slider=False):
         """
         Streams a video on the filesystem to a tkinter Label.
@@ -149,6 +155,7 @@ class VideoPlayer:
         :param skip_size_s: int: The number of seconds the video should skip when skipped forward or backward
         :param override_slider: bool: Set to true if you want to configure an external callback for the Slider
         """
+        self.root = root
         self.path = path
         self.label = label
         self.playing = False
@@ -170,18 +177,108 @@ class VideoPlayer:
         self.slider_var = slider_var
         self.override_slider = override_slider
         if self.slider:
-            self.slider.config(from_=1, to=self.nframes)
-            self.slider.config(length=size[0])
-            if not override_slider:
-                self.slider.config(command=self.slider_frame_load)
-            self.slider_var = slider_var
-            self.slider_var.set(1)
+            if type(self.slider) == tk.Scale:
+                self.slider.config(from_=1, to=self.nframes)
+                self.slider.config(length=size[0])
+                if not override_slider:
+                    self.slider.config(command=self.__slider_frame_load)
+                self.slider_var = slider_var
+                self.slider_var.set(1)
+            elif type(self.slider) == TickScale:
+                self.trough_img = tk.PhotoImage('img_trough', width=size[0], height=10, master=self.root)
+                self.set_img_color(self.trough_img, ['white', 'red'], [size[0], 0])
+                style_name = self.__create_slider_style()
+                self.slider.configure(style=style_name)
+                self.slider.configure(from_=1, to=int(self.nframes))
+                self.slider.configure(length=size[0])
+                self.slider.configure(resolution=1)
+                if not override_slider:
+                    self.slider.configure(command=self.__slider_frame_load)
         self.play_button = play_button
         self.play_image = play_image
         self.pause_image = pause_image
         if self.play_button:
             self.play_button.config(image=self.play_image, command=self.toggle_video)
-        self.load_frame(1)
+        self.load_frame_index = 0
+        self.loading = True
+        self.frames = [None] * self.nframes
+        self.load_thread = threading.Thread(target=self.__load_video)
+        self.load_thread.start()
+
+    @staticmethod
+    def set_img_color(img, colors, widths):
+        """
+        Sets the colors of a PhotoImage column by column in place
+        Example: set_img_color(img, ['white', 'red'], [100, 100])
+        Sets a column of width 100px to white and a column of width 100px to red from left to right
+        :param img: PhotoImage
+        :param colors: list, colors to set columns to
+        :param widths: list, widths to set columns to
+        :return: None
+        """
+        pixel_line = "{"
+        for color, width in zip(colors, widths):
+            for i in range(0, width):
+                pixel_line = pixel_line + f" {color}"
+        pixel_line = pixel_line + "}"
+        pixels = " ".join(pixel_line for i in range(img.height()))
+        img.put(pixels)
+
+    def __clear_loading_slider(self):
+        """
+        Clears the loading slider to a solid color
+        :return: None
+        """
+        self.set_img_color(self.trough_img, ['white', 'red'],
+                           [int(self.size[0] * (self.load_frame_index / self.nframes)), 0])
+        self.slider.configure(style='custom.Horizontal.TScale')
+
+    def __update_loading_slider(self):
+        """
+        Updates the loading slider to the current number of loaded frames
+        :return: None
+        """
+        self.set_img_color(self.trough_img, ['white', 'red'],
+                           [int(self.size[0] * (self.load_frame_index / self.nframes)),
+                            self.size[0] - int(self.size[0] * (self.load_frame_index / self.nframes))])
+        self.slider.configure(style='custom.Horizontal.TScale')
+
+    def __create_slider_style(self):
+        fig_color = '#%02x%02x%02x' % (240, 240, 237)
+        self.style = ttk.Style(self.root)
+        self.style.theme_use('clam')
+        self.style.element_create('Horizontal.Scale.trough', 'image', self.trough_img)
+        # create custom layout
+        self.style.layout('custom.Horizontal.TScale',
+                          [('Horizontal.Scale.trough',
+                            {'sticky': 'nswe',
+                             'children': [('custom.Horizontal.Scale.slider',
+                                           {'side': 'left', 'sticky': ''})]})])
+        self.style.configure('custom.Horizontal.TScale', background=fig_color)
+        return 'custom.Horizontal.TScale'
+
+    def __load_video(self):
+        """
+        Background thread to load in frames to prevent issues when playing
+        :return: None
+        """
+        self.load_frame_index = 0
+        frame_data = imageio.get_reader(self.path)
+        for image in frame_data.iter_data():
+            try:
+                self.frames[self.load_frame_index] = (ImageTk.PhotoImage(Image.fromarray(image).resize(self.size)))
+                if self.load_frame_index == 1:
+                    self.load_frame(1)
+                if self.load_frame_index % 10:
+                    if self.slider:
+                        if type(self.slider) == TickScale:
+                            self.__update_loading_slider()
+                self.load_frame_index += 1
+                if not self.loading:
+                    break
+            except IndexError as e:
+                break
+        self.__clear_loading_slider()
 
     def play_video(self):
         """
@@ -213,7 +310,7 @@ class VideoPlayer:
         else:
             self.pause_video()
 
-    def slider_frame_load(self, value):
+    def __slider_frame_load(self, value):
         """
         Callback for the slider to load a frame
         :param value: str: The slider value
@@ -227,13 +324,17 @@ class VideoPlayer:
         :param frame: int: The frame to load.
         :return: None
         """
-        image, met = self.frame_data._get_data(int(frame) - 1)
-        frame_image = ImageTk.PhotoImage(Image.fromarray(image).resize(self.size))
-        self.label.config(image=frame_image)
-        self.label.image = frame_image
-        self.current_frame = int(frame)
-        if self.slider:
-            self.slider.set(self.current_frame)
+        if int(float(frame)) != self.current_frame:
+            frame_image = self.frames[int(float(frame)) - 1]
+            if frame_image:
+                self.label.config(image=frame_image)
+                self.label.image = frame_image
+                self.current_frame = int(float(frame))
+                if self.slider:
+                    self.slider.set(self.current_frame)
+            else:
+                if self.slider:
+                    self.slider.set(self.current_frame)
 
     def stop_playing(self):
         """
@@ -252,8 +353,7 @@ class VideoPlayer:
         if self.playing:
             self.skip_forward = True
         else:
-            self.current_frame = self.current_frame + int(self.skip_size * self.fps)
-            self.load_frame(self.current_frame)
+            self.load_frame(self.current_frame + int(self.skip_size * self.fps))
 
     def skip_video_backward(self):
         """
@@ -264,25 +364,43 @@ class VideoPlayer:
         if self.playing:
             self.skip_backward = True
         else:
-            self.current_frame = self.current_frame - int(self.skip_size * self.fps)
-            self.load_frame(self.current_frame)
+            self.load_frame(self.current_frame - int(self.skip_size * self.fps))
 
-    def playing_thread(self):
+    def __playing_thread(self):
         """
         Thread that will stream the video file to a Label at the source frame rate.
         :return: None
         """
-        frame_data = imageio.get_reader(self.path)
-        frame_data._checkClosed()
-        n = frame_data.get_length()
+        n = self.nframes
         i = int(self.current_frame)
         self.playing = True
         while i < n:
             if not self.playing:
                 break
             try:
-                im, meta = frame_data._get_data(i)
-                self.current_frame = i
+                if i < self.load_frame_index:
+                    im = self.frames[i]
+                    self.current_frame = i
+                    if self.label.winfo_viewable():
+                        frame_image = im
+                        self.label.config(image=frame_image)
+                        self.label.image = frame_image
+                        if self.override_slider:
+                            if self.slider:
+                                # Trigger callback each time a frame is loaded
+                                self.slider.set(i)
+                        else:
+                            if self.slider_var:
+                                self.slider_var.set(i)
+                    if self.skip_forward:
+                        i += int(self.skip_size * self.fps)
+                        self.skip_forward = False
+                    elif self.skip_backward:
+                        i -= int(self.skip_size * self.fps)
+                        self.skip_backward = False
+                    else:
+                        i += 1
+                    time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
             except StopIteration as e:
                 print(str(e))
                 break
@@ -292,25 +410,6 @@ class VideoPlayer:
                 if n == float("inf"):
                     break
                 raise
-            if self.label.winfo_viewable():
-                frame_image = ImageTk.PhotoImage(Image.fromarray(im).resize(self.size))
-                self.label.config(image=frame_image)
-                self.label.image = frame_image
-                if self.override_slider:
-                    if self.slider:
-                        # Trigger callback each time a frame is loaded
-                        self.slider.set(i)
-                else:
-                    if self.slider_var:
-                        self.slider_var.set(i)
-            if self.skip_forward:
-                i += int(self.skip_size * self.fps)
-                self.skip_forward = False
-            elif self.skip_backward:
-                i -= int(self.skip_size * self.fps)
-                self.skip_backward = False
-            i += 1
-            time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
         self.playing = False
         if self.current_frame > self.nframes:
             self.current_frame = self.nframes
@@ -325,8 +424,7 @@ class VideoPlayer:
         self.playing = True
         if self.current_frame == self.nframes:
             self.current_frame = 0
-        thread = threading.Thread(target=self.playing_thread)
-        thread.daemon = 1
+        thread = threading.Thread(target=self.__playing_thread)
         thread.start()
 
 

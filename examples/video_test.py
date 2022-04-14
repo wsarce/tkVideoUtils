@@ -1,4 +1,7 @@
 from tkinter import *
+
+from ttkwidgets import TickScale
+
 from tkvideoutils import VideoPlayer
 from tkinter import filedialog, messagebox
 
@@ -19,7 +22,8 @@ if __name__ == '__main__':
     video_label = Label(root)
     video_path = filedialog.askopenfilename()
     slider_var = IntVar(root)
-    slider = Scale(root, orient=HORIZONTAL, variable=slider_var)
+    # slider = Scale(root, orient=HORIZONTAL, variable=slider_var)
+    slider = TickScale(root, orient="horizontal", variable=slider_var)
     # place elements
     video_label.pack()
     button.pack()
@@ -29,10 +33,9 @@ if __name__ == '__main__':
 
     if video_path:
         # read video to display on label
-        player = VideoPlayer(video_path, video_label,
-                             loop=False, size=(700, 500),
+        player = VideoPlayer(root, video_path, video_label, size=(700, 500),
                              play_button=button, play_image=play_image, pause_image=pause_image,
-                             slider=slider, slider_var=slider_var)
+                             slider=slider, slider_var=slider_var, keep_ratio=True)
     else:
         messagebox.showwarning("Select Video File", "Please retry and select a video file.")
         sys.exit(1)
