@@ -203,6 +203,7 @@ class VideoPlayer:
         self.loading = True
         self.frames = [None] * self.nframes
         self.load_thread = threading.Thread(target=self.__load_video)
+        self.load_thread.daemon = True
         self.load_thread.start()
 
     @staticmethod
@@ -425,6 +426,7 @@ class VideoPlayer:
         if self.current_frame == self.nframes:
             self.current_frame = 0
         thread = threading.Thread(target=self.__playing_thread)
+        thread.daemon = True
         thread.start()
 
 

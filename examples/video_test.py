@@ -5,6 +5,14 @@ from ttkwidgets import TickScale
 from tkvideoutils import VideoPlayer
 from tkinter import filedialog, messagebox
 
+
+def on_closing():
+    player.loading = False
+    print(player.loading)
+    root.quit()
+    root.destroy()
+
+
 if __name__ == '__main__':
     # create instance of window
     root = Tk()
@@ -41,4 +49,5 @@ if __name__ == '__main__':
         sys.exit(1)
     forward_button.config(command=player.skip_video_forward)
     backward_button.config(command=player.skip_video_backward)
+    root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
