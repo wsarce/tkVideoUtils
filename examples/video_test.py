@@ -8,7 +8,6 @@ from tkinter import filedialog, messagebox
 
 def on_closing():
     player.loading = False
-    print(player.loading)
     root.quit()
     root.destroy()
 

@@ -161,18 +161,20 @@ class VideoPlayer:
         self.playing = False
         self.skip_forward, self.skip_backward = False, False
         self.skip_size = skip_size_s
-        self.frame_data = imageio.get_reader(path)
+        temp = imageio.get_reader(path)
+        self.raw_size = temp._get_data(0)[0].shape
+        temp.close()
         meta_data = cv2.VideoCapture(path)
-        self.fps = meta_data.get(cv2.CAP_PROP_FPS)
+        self.fps = int(meta_data.get(cv2.CAP_PROP_FPS))
         self.frame_duration = float(1 / self.fps)
         self.nframes = int(meta_data.get(cv2.CAP_PROP_FRAME_COUNT))
         self.current_frame = 0
         if keep_ratio:
-            temp = self.frame_data._get_data(0)[0].shape
-            self.aspect_ratio = float(temp[1]) / float(temp[0])
+            self.aspect_ratio = float(self.raw_size[1]) / float(self.raw_size[0])
             self.size = (size[0], int(size[0] / self.aspect_ratio))
         else:
             self.size = size
+
         self.slider = slider
         self.slider_var = slider_var
         self.override_slider = override_slider
@@ -201,6 +203,7 @@ class VideoPlayer:
             self.play_button.config(image=self.play_image, command=self.toggle_video)
         self.load_frame_index = 0
         self.loading = True
+        meta_data.release()
         self.frames = [None] * self.nframes
         self.load_thread = threading.Thread(target=self.__load_video)
         self.load_thread.daemon = True
@@ -264,10 +267,15 @@ class VideoPlayer:
         :return: None
         """
         self.load_frame_index = 0
+        last_image = None
         frame_data = imageio.get_reader(self.path)
         for image in frame_data.iter_data():
             try:
+                if last_image is not None:
+                    if (last_image == image).all():
+                        continue
                 self.frames[self.load_frame_index] = (ImageTk.PhotoImage(Image.fromarray(image).resize(self.size)))
+                last_image = image
                 if self.load_frame_index == 1:
                     self.load_frame(1)
                 if self.load_frame_index % 10:
@@ -386,13 +394,13 @@ class VideoPlayer:
                         frame_image = im
                         self.label.config(image=frame_image)
                         self.label.image = frame_image
-                        if self.override_slider:
-                            if self.slider:
-                                # Trigger callback each time a frame is loaded
-                                self.slider.set(i)
-                        else:
-                            if self.slider_var:
-                                self.slider_var.set(i)
+                    if self.override_slider:
+                        if self.slider:
+                            # Trigger callback each time a frame is loaded
+                            self.slider.set(i)
+                    else:
+                        if self.slider_var:
+                            self.slider_var.set(i)
                     if self.skip_forward:
                         i += int(self.skip_size * self.fps)
                         self.skip_forward = False
