@@ -334,16 +334,28 @@ class VideoPlayer:
         :return: None
         """
         if int(float(frame)) != self.current_frame:
-            frame_image = self.frames[int(float(frame)) - 1]
-            if frame_image:
-                self.label.config(image=frame_image)
-                self.label.image = frame_image
-                self.current_frame = int(float(frame))
-                if self.slider:
-                    self.slider.set(self.current_frame)
-            else:
-                if self.slider:
-                    self.slider.set(self.current_frame)
+            try:
+                frame_image = self.frames[int(float(frame)) - 1]
+                if frame_image:
+                    self.label.config(image=frame_image)
+                    self.label.image = frame_image
+                    self.current_frame = int(float(frame))
+                    if self.slider:
+                        self.slider.set(self.current_frame)
+                else:
+                    if self.slider:
+                        self.slider.set(self.current_frame)
+            except IndexError:
+                frame_image = self.frames[self.load_frame_index - 1]
+                if frame_image:
+                    self.label.config(image=frame_image)
+                    self.label.image = frame_image
+                    self.current_frame = self.load_frame_index - 1
+                    if self.slider:
+                        self.slider.set(self.current_frame)
+                else:
+                    if self.slider:
+                        self.slider.set(self.current_frame)
 
     def stop_playing(self):
         """
@@ -362,7 +374,10 @@ class VideoPlayer:
         if self.playing:
             self.skip_forward = True
         else:
-            self.load_frame(self.current_frame + int(self.skip_size * self.fps))
+            new_frame = self.current_frame + int(self.skip_size * self.fps)
+            if new_frame > (self.load_frame_index - 1):
+                new_frame = self.load_frame_index - 1
+            self.load_frame(new_frame)
 
     def skip_video_backward(self):
         """
@@ -373,7 +388,10 @@ class VideoPlayer:
         if self.playing:
             self.skip_backward = True
         else:
-            self.load_frame(self.current_frame - int(self.skip_size * self.fps))
+            new_frame = (self.current_frame - int(self.skip_size * self.fps))
+            if new_frame < 1:
+                new_frame = 1
+            self.load_frame(new_frame)
 
     def __playing_thread(self):
         """
@@ -410,6 +428,8 @@ class VideoPlayer:
                     else:
                         i += 1
                     time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
+                else:
+                    i = self.load_frame_index - 1
             except StopIteration as e:
                 print(str(e))
                 break
