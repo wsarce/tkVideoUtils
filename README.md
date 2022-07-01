@@ -40,6 +40,9 @@ tkVideoUtils is a Python module for playing and recording videos in GUIs created
 * [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg)
 * [Pillow](https://pypi.org/project/Pillow/)
 * [opencv-python](https://pypi.org/project/opencv-python/)
+* [moviepy](https://pypi.org/project/moviepy/)
+* [ffmpy](https://pypi.org/project/ffmpy/)
+* [PyAudio](https://pypi.org/project/PyAudio/)
 
 
 ## Installation
