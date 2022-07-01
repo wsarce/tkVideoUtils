@@ -1,5 +1,5 @@
-""" tkVideoUtils: Python module for playing and recording videos (without sound) inside tkinter Label widget using
-Pillow and imageio
+""" tkVideoUtils: Python module for playing and recording videos with sound inside tkinter Label widget using
+Pillow, imageio, and PyAudio
 
 Copyright © 2022 Walker Arce (wsarcera@gmail.com)
 Released under the terms of the MIT license (https://opensource.org/licenses/MIT) as described in LICENSE.md
@@ -8,8 +8,11 @@ import os
 import pathlib
 import shutil
 import time
+import traceback
+import wave
 from tkinter import ttk
-
+from moviepy.editor import AudioFileClip
+import ffmpy
 from ttkwidgets import TickScale
 
 try:
@@ -20,6 +23,7 @@ import threading
 import imageio
 import cv2
 from PIL import Image, ImageTk
+import pyaudio
 
 
 class VideoRecorder:
@@ -27,11 +31,14 @@ class VideoRecorder:
     Class that handles the recording and streaming of video
     """
 
-    def __init__(self, source, path, fps, label, size=(640, 360), keep_ratio=True):
+    def __init__(self, video_source, audio_source, video_path, audio_path, fps, label, size=(640, 360),
+                 keep_ratio=True):
         """
         Streams, records, and handles webcam feeds
-        :param source: tuple: Use VideoRecorder.get_sources() to get compatible sources
-        :param path: path-like: Output save path of the recorded video
+        :param video_source: tuple: Use VideoRecorder.get_video_sources() to get compatible sources
+        :param audio_source: tuple: Use VideoRecorder.get_audio_sources() to get compatible sources
+        :param video_path: path-like: Output save path of the recorded video
+        :param audio_path: path-like: Output save path of the recorded audio
         :param fps: float or int: The recording frames per second
         :param label: Tk Label: The Label that will be used to display the video
         :param size: tuple: The height and width of the video on the Label
@@ -40,22 +47,46 @@ class VideoRecorder:
         self.fps = fps
         self.frame_duration = float(1 / self.fps)
         self.label = label
-        self.output_path = path
-        self.source = source
+        self.video_output = os.path.join(pathlib.Path(video_path).parent,
+                                         pathlib.Path(video_path).stem + "_raw" +
+                                         pathlib.Path(video_path).suffix)
+        self.audio_output = audio_path
+        self.video_source = video_source
+        self.audio_source = audio_source
         self.thread = None
         self.recording = False
         self.playing = False
         self.cam = None
+        self.cam_frame = None
+        self.mic = None
+        self.mic_data = []
         self.writer = None
         self.current_frame = 0
+        self.p = None
         if keep_ratio:
-            self.aspect_ratio = float(source[1][1]) / float(source[1][0])
+            self.aspect_ratio = float(self.video_source[1][1]) / float(self.video_source[1][0])
             self.size = (size[0], int(size[0] / self.aspect_ratio))
         else:
             self.size = size
 
     @staticmethod
-    def get_sources():
+    def get_audio_sources():
+        """
+        Polls the audio sources and gets their description
+        :return: tuple: First value is the output index, second value is the description
+        """
+        sources = []
+        p = pyaudio.PyAudio()
+        info = p.get_host_api_info_by_index(0)
+        numdevices = info.get('deviceCount')
+
+        for i in range(0, numdevices):
+            if (p.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
+                sources.append((i, p.get_device_info_by_host_api_device_index(0, i).get('name')))
+        return sources
+
+    @staticmethod
+    def get_video_sources():
         """
         Polls webcam sources and find their video resolution, i.e., (0, (780, 420)).  Passing one of these sources to
         the VideoRecorder object will allow it to use that camera.
@@ -71,7 +102,78 @@ class VideoRecorder:
                 break
         return sources
 
-    def recording_thread(self):
+    def __save_audio_file(self, filename):
+        """
+        Saves the recorded audio to the specified filename
+        :param filename: path-like: Full filepath including filename for output file
+        :return: None
+        """
+        wf = wave.open(filename, "wb")
+        # set the channels
+        wf.setnchannels(self.mic_channels)
+        # set the sample format
+        wf.setsampwidth(self.p.get_sample_size(self.audio_format))
+        # set the sample rate
+        wf.setframerate(self.mic_sample_rate)
+        # write the frames as bytes
+        wf.writeframes(b"".join(self.mic_data))
+        # close the file
+        wf.close()
+
+    def __get_mic_recorder(self, source, chunk=1024, audio_format=pyaudio.paInt16, channels=1, sample_rate=44100):
+        """
+        Gets a microphone recording instance from a specified source
+        :param source: tuple: Selected source from get_audio_sources
+        :param chunk: int: The chunk size to get audio in
+        :param audio_format: int: pyaudio format to save audio data in, default pyaudio.paInt16
+        :param channels: int: Number of channels to record, default is one
+        :param sample_rate: int: The sampling speed of the microphone, default is 44100 Hz
+        :return: Microphone instance
+        """
+        self.mic_chunk = chunk
+        self.audio_format = audio_format
+        self.mic_channels = channels
+        self.mic_sample_rate = sample_rate
+        if not self.p:
+            self.p = pyaudio.PyAudio()
+        return self.p.open(format=audio_format,
+                           channels=channels,
+                           rate=sample_rate,
+                           input_device_index=source,
+                           input=True,
+                           frames_per_buffer=chunk)
+
+    def __close_mic_recorder(self):
+        """
+        Closes the microphone recording instance
+        :return: None
+        """
+        if self.mic:
+            self.mic.stop_stream()
+            self.mic.close()
+            self.p.terminate()
+
+    def __audio_recording_thread(self):
+        """
+        Saves the input from an audio source to specified file
+        :return: None
+        """
+        self.mic_data = []
+        while self.playing:
+            try:
+                if self.recording:
+                    self.mic_data.append(self.mic.read(self.mic_chunk))
+                else:
+                    time.sleep(0.01)
+            except Exception as e:
+                if self.recording:
+                    print(
+                        f"ERROR: Exception encountered in tkVideoUtils.VideoRecorder audio recording thread: {str(e)}")
+        if self.mic_data:
+            self.__save_audio_file(self.audio_output)
+        self.__close_mic_recorder()
+
+    def __video_recording_thread(self):
         """
         Thread that plays and records video in the background.  Will only update the image on the Label is the Label
         is currently being viewed.
@@ -79,32 +181,89 @@ class VideoRecorder:
         """
         while self.playing:
             try:
-                im = self.cam.get_next_data()
+                start_time = time.time()
+                self.cam_frame = self.cam.get_next_data()
                 if self.recording:
-                    self.writer.append_data(im)
-                    self.current_frame += 1
-                if self.label.winfo_viewable():
-                    frame_image = ImageTk.PhotoImage(Image.fromarray(im).resize(self.size))
-                    self.label.config(image=frame_image)
-                    self.label.image = frame_image
-                time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
-            except Exception:
-                continue
+                    self.writer.append_data(self.cam_frame)
+                if self.recording:
+                    process_time = time.time() - start_time
+                else:
+                    process_time = 0
+                time.sleep((self.frame_duration - process_time) - time.monotonic() % self.frame_duration)
+            except Exception as e:
+                if self.recording:
+                    print(
+                        f"ERROR: Exception encountered in tkVideoUtils.VideoRecorder video recording thread: {str(e)}")
         if self.writer:
             self.writer.close()
         self.cam.close()
 
-    def start_recording(self, output_path=None):
+    def __video_display_thread(self):
         """
-        Start webcam recording, if an output path is provided then the original output path is overwritten.
-        :param output_path: path-like: Desired absolute filepath for the recorded video
+        Thread that updates the video display label with the current frame
         :return: None
         """
-        if output_path:
-            self.output_path = output_path
-            self.writer = imageio.get_writer(output_path, fps=self.fps)
+        last_image = None
+        while self.playing:
+            try:
+                if self.cam_frame is not None:
+                    if last_image is not None:
+                        if (last_image == self.cam_frame).all():
+                            continue
+                    if self.label.winfo_viewable():
+                        frame_image = ImageTk.PhotoImage(Image.fromarray(self.cam_frame).resize(self.size))
+                        self.label.config(image=frame_image)
+                        self.label.image = frame_image
+                    last_image = self.cam_frame
+            except Exception as e:
+                if self.recording:
+                    print(
+                        f"ERROR: Exception encountered in tkVideoUtils.VideoRecorder video recording thread: {str(e)}")
+
+    def merge_sources(self, output, ffmpeg_path, overwrite='-y', delete_file=True):
+        """
+        Uses FFMPEG to add an audio source to an MP4 file
+        :param delete_file: bool: If true, the raw audio and video files are deleted
+        :param output: path-like: Full filepath to output file including filename
+        :param ffmpeg_path: path-like: Full filepath to FFMPEG instance to use
+        :param overwrite: string: -y to overwrite (default) or -n to not overwrite
+        :return: bool: True if successful, False if unsuccessful
+        """
+        try:
+            ff = ffmpy.FFmpeg(
+                executable=ffmpeg_path,
+                inputs={self.video_output: None, self.audio_output: None},
+                outputs={output: f'-vcodec copy {overwrite} -shortest'}
+            )
+            ff.run()
+            if delete_file:
+                os.remove(self.video_output)
+                os.remove(self.audio_output)
+            return True
+        except ffmpy.FFRuntimeError as ffre:
+            print(f"ERROR: Exception encountered merging audio and video sources {str(ffre)}")
+            return False
+        except ffmpy.FFExecutableNotFoundError as ffenfe:
+            print(f"ERROR: FFmpeg executable not found!")
+            return False
+        except Exception as e:
+            print(f"ERROR: Exception encountered with merging sources {str(e)}")
+            return False
+
+    def start_recording(self, video_output=None, audio_output=None):
+        """
+        Start webcam recording, if an output path is provided then the original output path is overwritten.
+        :param video_output: path-like: Desired absolute filepath for the recorded video
+        :param audio_output: path-like: Desired absolute filepath for the recorded audio
+        :return: None
+        """
+        if video_output:
+            self.video_output = video_output
+            self.writer = imageio.get_writer(video_output, fps=self.fps)
         else:
-            self.writer = imageio.get_writer(self.output_path, fps=self.fps)
+            self.writer = imageio.get_writer(self.video_output, fps=self.fps)
+        if audio_output:
+            self.audio_output = audio_output
         self.recording = True
 
     def stop_recording(self):
@@ -128,10 +287,17 @@ class VideoRecorder:
         """
         self.playing = True
         self.current_frame = 0
-        self.cam = imageio.get_reader(f'<video{self.source[0]}>', fps=self.fps)
-        self.thread = threading.Thread(target=self.recording_thread)
-        self.thread.daemon = 1
-        self.thread.start()
+        self.cam = imageio.get_reader(f'<video{self.video_source[0]}>', fps=self.fps)
+        self.mic = self.__get_mic_recorder(self.audio_source[0])
+        self.video_thread = threading.Thread(target=self.__video_recording_thread)
+        self.video_thread.daemon = 1
+        self.video_thread.start()
+        self.audio_thread = threading.Thread(target=self.__audio_recording_thread)
+        self.audio_thread.daemon = 1
+        self.audio_thread.start()
+        self.view_thread = threading.Thread(target=self.__video_display_thread)
+        self.view_thread.daemon = 1
+        self.view_thread.start()
 
 
 class VideoPlayer:
@@ -139,11 +305,13 @@ class VideoPlayer:
     Class that handles the streaming of a video file from the filesystem to a Label.
     """
 
-    def __init__(self, root, path, label, size=(640, 360), play_button=None, play_image=None, pause_image=None,
-                 slider=None, slider_var=None, keep_ratio=False, skip_size_s=1, override_slider=False):
+    def __init__(self, root, video_path, audio_path, label, size=(640, 360), play_button=None, play_image=None,
+                 pause_image=None, slider=None, slider_var=None, keep_ratio=False, skip_size_s=1,
+                 override_slider=False, cleanup_audio=False):
         """
         Streams a video on the filesystem to a tkinter Label.
-        :param path: path-like: Absolute path to the video file to be streamed
+        :param video_path: path-like: Absolute path to the video file to be streamed
+        :param audio_path: path-like: Absolute path to the audio file to be streamed
         :param label: Tk Label: The Label that will stream the video
         :param size: tuple: The size of the video on the Tk Label.
         :param play_button: Tk Button: Pass in a Button that will be wired up to control the play/pause of the video
@@ -154,21 +322,37 @@ class VideoPlayer:
         :param keep_ratio: bool: If True, the source aspect ratio will be kept
         :param skip_size_s: int: The number of seconds the video should skip when skipped forward or backward
         :param override_slider: bool: Set to true if you want to configure an external callback for the Slider
+        :param cleanup_audio: bool: Set to have separated audio track deleted after it's been loaded
         """
         self.root = root
-        self.path = path
+        self.video_path = video_path
+        self.audio_path = audio_path
+        self.audio_index = 0
+        self.play_audio = False
+        self.audio_chunk = 1024
+        self.cleanup_audio = False
+        if not os.path.exists(self.audio_path):
+            temp_audioclip = AudioFileClip(self.video_path)
+            temp_audioclip.write_audiofile(self.audio_path, codec='pcm_s16le')
+            temp_audioclip.close()
+            self.cleanup_audio = cleanup_audio
+        self.audio_file = wave.open(self.audio_path, 'rb')
+        self.start_stream()
+        self.stream_attr = self.get_wav_attr(self.audio_file)
         self.label = label
         self.playing = False
         self.skip_forward, self.skip_backward = False, False
         self.skip_size = skip_size_s
-        temp = imageio.get_reader(path)
+        temp = imageio.get_reader(self.video_path)
         self.raw_size = temp._get_data(0)[0].shape
         temp.close()
-        meta_data = cv2.VideoCapture(path)
+        meta_data = cv2.VideoCapture(self.video_path)
         self.fps = int(meta_data.get(cv2.CAP_PROP_FPS))
         self.frame_duration = float(1 / self.fps)
         self.nframes = int(meta_data.get(cv2.CAP_PROP_FRAME_COUNT))
         self.current_frame = 0
+        self.start_frame = None
+        self.clip_frame = None
         if keep_ratio:
             self.aspect_ratio = float(self.raw_size[1]) / float(self.raw_size[0])
             self.size = (size[0], int(size[0] / self.aspect_ratio))
@@ -205,9 +389,51 @@ class VideoPlayer:
         self.loading = True
         meta_data.release()
         self.frames = [None] * self.nframes
+        self.audio_data = [None] * int(self.stream_attr["nframes"] / self.audio_chunk)
         self.load_thread = threading.Thread(target=self.__load_video)
         self.load_thread.daemon = True
         self.load_thread.start()
+        self.video_thread_live = False
+        self.audio_load_thread = threading.Thread(target=self.__load_audio_thread)
+        self.audio_load_thread.daemon = True
+        self.audio_load_thread.start()
+        self.audio_thread_live = False
+
+    def start_stream(self):
+        """
+        Creates a new pyaudio instance and opens a new output stream
+        :return: None
+        """
+        self.p = pyaudio.PyAudio()
+        self.stream = self.p.open(
+            format=self.p.get_format_from_width(self.audio_file.getsampwidth()),
+            channels=self.audio_file.getnchannels(),
+            rate=self.audio_file.getframerate(),
+            frames_per_buffer=256,
+            output=True
+        )
+
+    def stop_stream(self):
+        """
+        Terminates the pyaudio instance and closes the output stream, starts up a new stream
+        :return: None
+        """
+        self.stream.close()
+        self.p.terminate()
+        self.start_stream()
+
+    @staticmethod
+    def get_wav_attr(audio_file):
+        """
+        Retrieves a dict of values for a wav file
+        :param audio_file: file-like: Open wav file
+        :return: dict: Dictionary of values
+        """
+        return {"nchannels": audio_file.getnchannels(),
+                "sampwidth": audio_file.getsampwidth(),
+                "framerate": audio_file.getframerate(),
+                "nframes": audio_file.getnframes(),
+                "params": audio_file.getparams()}
 
     @staticmethod
     def set_img_color(img, colors, widths):
@@ -248,6 +474,10 @@ class VideoPlayer:
         self.slider.configure(style='custom.Horizontal.TScale')
 
     def __create_slider_style(self):
+        """
+        Creates the style for the slider
+        :return: string: Name of style
+        """
         fig_color = '#%02x%02x%02x' % (240, 240, 237)
         self.style = ttk.Style(self.root)
         self.style.theme_use('clam')
@@ -268,7 +498,7 @@ class VideoPlayer:
         """
         self.load_frame_index = 0
         last_image = None
-        frame_data = imageio.get_reader(self.path)
+        frame_data = imageio.get_reader(self.video_path)
         for image in frame_data.iter_data():
             try:
                 if last_image is not None:
@@ -364,6 +594,10 @@ class VideoPlayer:
         """
         if self.playing:
             self.playing = False
+        if self.play_audio:
+            self.play_audio = False
+        while self.audio_thread_live or self.video_thread_live:
+            time.sleep(0.001)
 
     def skip_video_forward(self):
         """
@@ -372,7 +606,8 @@ class VideoPlayer:
         :return: None
         """
         if self.playing:
-            self.skip_forward = True
+            return
+            # self.skip_forward = True
         else:
             new_frame = self.current_frame + int(self.skip_size * self.fps)
             if new_frame > (self.load_frame_index - 1):
@@ -386,21 +621,88 @@ class VideoPlayer:
         :return: None
         """
         if self.playing:
-            self.skip_backward = True
+            return
+            # self.skip_backward = True
         else:
             new_frame = (self.current_frame - int(self.skip_size * self.fps))
             if new_frame < 1:
                 new_frame = 1
             self.load_frame(new_frame)
 
+    def set_clip(self, start_frame, end_frame):
+        """
+        Sets the start and end frame for a clip, when video is played it will start and stop at these frames.
+        :param start_frame: int: Starting frame for clip
+        :param end_frame: int: Ending frame for clip
+        :return: None
+        """
+        self.start_frame = start_frame
+        self.clip_frame = end_frame
+
+    def clear_clip(self):
+        """
+        Clears the clip setting
+        :return: None
+        """
+        self.start_frame = None
+        self.clip_frame = None
+
+    def __load_audio_thread(self):
+        """
+        Loads in wav file for usage in audio playback thread, closes audio file once completed
+        :return: None
+        """
+        self.audio_data = []
+        while True:
+            data = self.audio_file.readframes(self.audio_chunk)
+            if data != b'':
+                self.audio_data.append(data)
+            else:
+                break
+        self.audio_file.close()
+        if self.cleanup_audio:
+            os.remove(self.audio_path)
+
+    def __audio_thread(self):
+        """
+        Writes the current audio_index to the output stream
+        :return: None
+        """
+        self.audio_thread_live = True
+        try:
+            while (self.audio_index < len(self.audio_data) - 1) and self.playing:
+                if self.play_audio:
+                    if self.playing:
+                        self.stream.write(self.audio_data[self.audio_index])
+                        self.audio_index += 1
+                    else:
+                        break
+                else:
+                    time.sleep(0.001)
+            self.play_audio = False
+            self.stop_stream()
+            self.audio_thread_live = False
+        except Exception as e:
+            print(str(e), traceback.print_exc())
+
+    def __update_audio_index(self):
+        """
+        Updates the index to play from the audio stream based off of the current frame
+        :return: None
+        """
+        self.audio_index = int((len(self.audio_data) * self.current_frame) / len(self.frames))
+
     def __playing_thread(self):
         """
         Thread that will stream the video file to a Label at the source frame rate.
         :return: None
         """
+        self.video_thread_live = True
         n = self.nframes
         i = int(self.current_frame)
         self.playing = True
+        self.__update_audio_index()
+        self.play_audio = True
         while i < n:
             if not self.playing:
                 break
@@ -419,6 +721,9 @@ class VideoPlayer:
                     else:
                         if self.slider_var:
                             self.slider_var.set(i)
+                    if self.start_frame and self.clip_frame:
+                        if not (self.start_frame <= i < self.clip_frame):
+                            break
                     if self.skip_forward:
                         i += int(self.skip_size * self.fps)
                         self.skip_forward = False
@@ -439,7 +744,10 @@ class VideoPlayer:
                 if n == float("inf"):
                     break
                 raise
+        self.video_thread_live = False
+        time.sleep(0.01)
         self.playing = False
+        self.play_audio = False
         if self.current_frame > self.nframes:
             self.current_frame = self.nframes
         if self.play_button:
@@ -451,11 +759,16 @@ class VideoPlayer:
         :return: None
         """
         self.playing = True
-        if self.current_frame == self.nframes:
+        if self.current_frame == self.nframes - 1:
             self.current_frame = 0
-        thread = threading.Thread(target=self.__playing_thread)
-        thread.daemon = True
-        thread.start()
+        if self.start_frame:
+            self.current_frame = self.start_frame
+        video_thread = threading.Thread(target=self.__playing_thread)
+        video_thread.daemon = True
+        video_thread.start()
+        audio_thread = threading.Thread(target=self.__audio_thread)
+        audio_thread.daemon = True
+        audio_thread.start()
 
 
 def cp_rename(src, dst, name):

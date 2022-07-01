@@ -4,9 +4,10 @@ with open('README.md') as f:
     readme = f.read()
 
 setup(name='tkVideoUtils',
-      version='0.5.30',
-      description='Python module for playing and recording videos (without sound) inside tkinter Label widget '
-                  'using Pillow and imageio, including media playback control, slider, and fps aware buffering.',
+      version='1.0.0',
+      description='Python module for playing and recording videos with sound inside tkinter Label widget '
+                  'using Pillow, imageio, and PyAudio, including media playback control, slider, '
+                  'and fps aware buffering.',
       long_description=readme,
       long_description_content_type="text/markdown",
       classifiers=[
@@ -25,7 +26,10 @@ setup(name='tkVideoUtils',
           'imageio-ffmpeg',
           'pillow',
           'opencv-python',
-          'ttkwidgets'
+          'ttkwidgets',
+          'pyaudio',
+          'ffmpy',
+          'moviepy'
       ],
       include_package_data=True,
       zip_safe=False
