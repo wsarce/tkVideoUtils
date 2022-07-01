@@ -81,8 +81,18 @@ This will create a shim between your code and the module binaries that gets upda
 
 ```py
 from tkinter import *
+
+from ttkwidgets import TickScale
+
 from tkvideoutils import VideoPlayer
 from tkinter import filedialog, messagebox
+
+
+def on_closing():
+    player.loading = False
+    root.quit()
+    root.destroy()
+
 
 if __name__ == '__main__':
     # create instance of window
@@ -99,9 +109,10 @@ if __name__ == '__main__':
     forward_button = Button(root, image=skip_forward)
     backward_button = Button(root, image=skip_backward)
     video_label = Label(root)
-    video_path = filedialog.askopenfilename()
+    video_path = 'recorded_video.mp4'
+    audio_path = 'recorded_video.wav'
     slider_var = IntVar(root)
-    slider = Scale(root, orient=HORIZONTAL, variable=slider_var)
+    slider = TickScale(root, orient="horizontal", variable=slider_var)
     # place elements
     video_label.pack()
     button.pack()
@@ -111,15 +122,16 @@ if __name__ == '__main__':
 
     if video_path:
         # read video to display on label
-        player = VideoPlayer(video_path, video_label,
-                             loop=False, size=(700, 500),
+        player = VideoPlayer(root, video_path, audio_path, video_label, size=(700, 500),
                              play_button=button, play_image=play_image, pause_image=pause_image,
-                             slider=slider, slider_var=slider_var)
+                             slider=slider, slider_var=slider_var, keep_ratio=True, cleanup_audio=True)
     else:
         messagebox.showwarning("Select Video File", "Please retry and select a video file.")
         sys.exit(1)
+    player.set_clip(50, 70)
     forward_button.config(command=player.skip_video_forward)
     backward_button.config(command=player.skip_video_backward)
+    root.protocol("WM_DELETE_WINDOW", on_closing)
     root.mainloop()
 ```
 
@@ -129,6 +141,24 @@ if __name__ == '__main__':
 from tkinter import *
 from tkvideoutils import VideoRecorder
 from tkinter import messagebox
+
+
+def merge_sources():
+    if player.merge_sources(merged_path, ffmpeg_exe):
+        print("Sources merged!")
+    else:
+        print("Something went wrong")
+
+
+def stop_recording():
+    player.stop_recording()
+    player.stop_playback()
+    button['command'] = merge_sources
+
+
+def start_recording():
+    player.start_recording()
+    button['command'] = stop_recording
 
 
 if __name__ == '__main__':
@@ -142,26 +172,33 @@ if __name__ == '__main__':
     # create user interface
     button = Button(root, image=play_image)
     video_label = Label(root)
-    video_path = 'test.mp4'
+    video_path = 'raw_video.mp4'
+    audio_path = 'recorded_video.wav'
+    merged_path = 'recorded_video.mp4'
     # place elements
     video_label.pack()
     button.pack()
     # Get existing video sources
-    video_sources = VideoRecorder.get_sources()
+    video_sources = VideoRecorder.get_video_sources()
+    audio_sources = VideoRecorder.get_audio_sources()
+    print(video_sources, audio_sources)
+    # TODO: Fill out FFMPEG path
+    ffmpeg_exe = r''
 
     if video_sources:
         if video_path:
             # read video to display on label
-            player = VideoRecorder(source=video_sources[0], path=video_path, fps=30, label=video_label, size=(700, 500))
+            player = VideoRecorder(video_source=video_sources[0], audio_source=audio_sources[1],
+                                   video_path=video_path, audio_path=audio_path, fps=8, label=video_label,
+                                   size=(700, 500))
             player.start_playback()
         else:
             messagebox.showwarning("Select Video File", "Please retry and select a video file.")
             sys.exit(1)
-        button.config(command=player.start_recording)
+        button.config(command=start_recording)
         root.mainloop()
     else:
         print("No video sources found!")
-
 ```
 ## Issues / Suggestions
 
