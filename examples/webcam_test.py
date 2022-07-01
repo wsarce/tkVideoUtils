@@ -43,7 +43,7 @@ if __name__ == '__main__':
     audio_sources = VideoRecorder.get_audio_sources()
     print(video_sources, audio_sources)
     # TODO: Fill out FFMPEG path
-    ffmpeg_exe = r'C:\Users\wsarc\AppData\Local\Programs\cometrics\1.0.13.5\external_bin\ffmpeg\ffmpeg-win64-v4.2.2.exe'
+    ffmpeg_exe = r''
 
     if video_sources:
         if video_path:
