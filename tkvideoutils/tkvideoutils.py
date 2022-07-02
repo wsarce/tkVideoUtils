@@ -238,6 +238,8 @@ class VideoRecorder:
         :param overwrite: string: -y to overwrite (default) or -n to not overwrite
         :return: bool: True if successful, False if unsuccessful
         """
+        while self.mic_thread_live or self.cam_thread_live:
+            time.sleep(0.01)
         try:
             ff = ffmpy.FFmpeg(
                 executable=ffmpeg_path,
