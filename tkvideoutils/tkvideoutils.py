@@ -47,9 +47,12 @@ class VideoRecorder:
         self.fps = fps
         self.frame_duration = float(1 / self.fps)
         self.label = label
-        self.video_output = os.path.join(pathlib.Path(video_path).parent,
-                                         pathlib.Path(video_path).stem + "_raw" +
-                                         pathlib.Path(video_path).suffix)
+        if video_path:
+            self.video_output = os.path.join(pathlib.Path(video_path).parent,
+                                             pathlib.Path(video_path).stem + "_raw" +
+                                             pathlib.Path(video_path).suffix)
+        else:
+            self.video_output = None
         self.audio_output = audio_path
         self.video_source = video_source
         self.audio_source = audio_source
@@ -58,8 +61,10 @@ class VideoRecorder:
         self.playing = False
         self.cam = None
         self.cam_frame = None
+        self.cam_thread_live = False
         self.mic = None
         self.mic_data = []
+        self.mic_thread_live = False
         self.writer = None
         self.current_frame = 0
         self.p = None
@@ -158,6 +163,7 @@ class VideoRecorder:
         Saves the input from an audio source to specified file
         :return: None
         """
+        self.mic_thread_live = True
         self.mic_data = []
         while self.playing:
             try:
@@ -172,6 +178,7 @@ class VideoRecorder:
         if self.mic_data:
             self.__save_audio_file(self.audio_output)
         self.__close_mic_recorder()
+        self.mic_thread_live = False
 
     def __video_recording_thread(self):
         """
@@ -179,6 +186,7 @@ class VideoRecorder:
         is currently being viewed.
         :return: None
         """
+        self.cam_thread_live = True
         while self.playing:
             try:
                 start_time = time.time()
@@ -197,6 +205,7 @@ class VideoRecorder:
         if self.writer:
             self.writer.close()
         self.cam.close()
+        self.cam_thread_live = False
 
     def __video_display_thread(self):
         """
@@ -258,8 +267,10 @@ class VideoRecorder:
         :return: None
         """
         if video_output:
-            self.video_output = video_output
-            self.writer = imageio.get_writer(video_output, fps=self.fps)
+            self.video_output = os.path.join(pathlib.Path(video_output).parent,
+                                             pathlib.Path(video_output).stem + "_raw" +
+                                             pathlib.Path(video_output).suffix)
+            self.writer = imageio.get_writer(self.video_output, fps=self.fps)
         else:
             self.writer = imageio.get_writer(self.video_output, fps=self.fps)
         if audio_output:
