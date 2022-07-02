@@ -346,12 +346,15 @@ class VideoPlayer:
         self.cleanup_audio = False
         if not os.path.exists(self.audio_path):
             temp_audioclip = AudioFileClip(self.video_path)
-            temp_audioclip.write_audiofile(self.audio_path, codec='pcm_s16le')
+            if len(temp_audioclip.reader.buffer):
+                temp_audioclip.write_audiofile(self.audio_path, codec='pcm_s16le')
+                self.audio_loaded = True
+            else:
+                self.audio_loaded = False
             temp_audioclip.close()
             self.cleanup_audio = cleanup_audio
-        self.audio_file = wave.open(self.audio_path, 'rb')
-        self.start_stream()
-        self.stream_attr = self.get_wav_attr(self.audio_file)
+        else:
+            self.audio_loaded = True
         self.label = label
         self.playing = False
         self.skip_forward, self.skip_backward = False, False
@@ -402,14 +405,18 @@ class VideoPlayer:
         self.loading = True
         meta_data.release()
         self.frames = [None] * self.nframes
-        self.audio_data = [None] * int(self.stream_attr["nframes"] / self.audio_chunk)
         self.load_thread = threading.Thread(target=self.__load_video)
         self.load_thread.daemon = True
         self.load_thread.start()
         self.video_thread_live = False
-        self.audio_load_thread = threading.Thread(target=self.__load_audio_thread)
-        self.audio_load_thread.daemon = True
-        self.audio_load_thread.start()
+        if self.audio_loaded:
+            self.audio_file = wave.open(self.audio_path, 'rb')
+            self.start_stream()
+            self.stream_attr = self.get_wav_attr(self.audio_file)
+            self.audio_data = [None] * int(self.stream_attr["nframes"] / self.audio_chunk)
+            self.audio_load_thread = threading.Thread(target=self.__load_audio_thread)
+            self.audio_load_thread.daemon = True
+            self.audio_load_thread.start()
         self.audio_thread_live = False
 
     def start_stream(self):
@@ -703,7 +710,8 @@ class VideoPlayer:
         Updates the index to play from the audio stream based off of the current frame
         :return: None
         """
-        self.audio_index = int((len(self.audio_data) * self.current_frame) / len(self.frames))
+        if self.audio_loaded:
+            self.audio_index = int((len(self.audio_data) * self.current_frame) / len(self.frames))
 
     def __playing_thread(self):
         """
@@ -779,9 +787,10 @@ class VideoPlayer:
         video_thread = threading.Thread(target=self.__playing_thread)
         video_thread.daemon = True
         video_thread.start()
-        audio_thread = threading.Thread(target=self.__audio_thread)
-        audio_thread.daemon = True
-        audio_thread.start()
+        if self.audio_loaded:
+            audio_thread = threading.Thread(target=self.__audio_thread)
+            audio_thread.daemon = True
+            audio_thread.start()
 
 
 def cp_rename(src, dst, name):
