@@ -4,6 +4,7 @@ Pillow, imageio, and PyAudio
 Copyright © 2022 Walker Arce (wsarcera@gmail.com)
 Released under the terms of the MIT license (https://opensource.org/licenses/MIT) as described in LICENSE.md
 """
+import _tkinter
 import os
 import pathlib
 import shutil
@@ -363,7 +364,7 @@ class VideoPlayer:
         self.raw_size = temp._get_data(0)[0].shape
         temp.close()
         meta_data = cv2.VideoCapture(self.video_path)
-        self.fps = int(meta_data.get(cv2.CAP_PROP_FPS))
+        self.fps = meta_data.get(cv2.CAP_PROP_FPS)
         self.frame_duration = float(1 / self.fps)
         self.nframes = int(meta_data.get(cv2.CAP_PROP_FRAME_COUNT))
         self.current_frame = 0
@@ -414,6 +415,7 @@ class VideoPlayer:
             self.start_stream()
             self.stream_attr = self.get_wav_attr(self.audio_file)
             self.audio_data = [None] * int(self.stream_attr["nframes"] / self.audio_chunk)
+            self.audio_loading = True
             self.audio_load_thread = threading.Thread(target=self.__load_audio_thread)
             self.audio_load_thread.daemon = True
             self.audio_load_thread.start()
@@ -498,17 +500,21 @@ class VideoPlayer:
         Creates the style for the slider
         :return: string: Name of style
         """
-        fig_color = '#%02x%02x%02x' % (240, 240, 237)
-        self.style = ttk.Style(self.root)
-        self.style.theme_use('clam')
-        self.style.element_create('Horizontal.Scale.trough', 'image', self.trough_img)
-        # create custom layout
-        self.style.layout('custom.Horizontal.TScale',
-                          [('Horizontal.Scale.trough',
-                            {'sticky': 'nswe',
-                             'children': [('custom.Horizontal.Scale.slider',
-                                           {'side': 'left', 'sticky': ''})]})])
-        self.style.configure('custom.Horizontal.TScale', background=fig_color)
+        try:
+            fig_color = '#%02x%02x%02x' % (240, 240, 237)
+            self.style = ttk.Style(self.root)
+            self.style.theme_use('clam')
+            self.style.element_create('Horizontal.Scale.trough', 'image', self.trough_img)
+            # create custom layout
+            self.style.layout('custom.Horizontal.TScale',
+                              [('Horizontal.Scale.trough',
+                                {'sticky': 'nswe',
+                                 'children': [('custom.Horizontal.Scale.slider',
+                                               {'side': 'left', 'sticky': ''})]})])
+            self.style.configure('custom.Horizontal.TScale', background=fig_color)
+        except _tkinter.TclError:
+            print("INFO: Style already exists!")
+            return 'custom.Horizontal.TScale'
         return 'custom.Horizontal.TScale'
 
     def __load_video(self):
@@ -674,12 +680,16 @@ class VideoPlayer:
         """
         self.audio_data = []
         while True:
-            data = self.audio_file.readframes(self.audio_chunk)
-            if data != b'':
-                self.audio_data.append(data)
+            if self.audio_loading:
+                data = self.audio_file.readframes(self.audio_chunk)
+                if data != b'':
+                    self.audio_data.append(data)
+                else:
+                    break
             else:
                 break
         self.audio_file.close()
+        self.audio_loading = False
         if self.cleanup_audio:
             os.remove(self.audio_path)
 
@@ -791,6 +801,11 @@ class VideoPlayer:
             audio_thread = threading.Thread(target=self.__audio_thread)
             audio_thread.daemon = True
             audio_thread.start()
+
+    def close(self):
+        self.loading = False
+        self.playing = False
+        self.audio_loading = False
 
 
 def cp_rename(src, dst, name):
