@@ -12,8 +12,8 @@ import time
 import traceback
 import wave
 from tkinter import ttk
-from moviepy.editor import AudioFileClip
 import ffmpy
+from moviepy.editor import AudioFileClip
 from ttkwidgets import TickScale
 
 try:
@@ -23,8 +23,61 @@ except ImportError:
 import threading
 import imageio
 import cv2
-from PIL import Image, ImageTk
 import pyaudio
+from itertools import count
+from tkinter import *
+from PIL import Image, ImageTk
+
+
+class ImageLabel:
+    """a label that displays images, and plays them if they are gifs
+    https://stackoverflow.com/a/43770948
+    """
+    def __init__(self, im, label, size):
+        self.load(im, label, size)
+
+    def load(self, im, label, size=(300, 300)):
+        if isinstance(im, str):
+            im = Image.open(im)
+        self.size = (size[0]-50, size[1]-50)
+        self.loc = 0
+        self.frames = []
+        self.label = label
+        try:
+            for i in count(1):
+                self.frames.append(ImageTk.PhotoImage(im.copy().resize(self.size, Image.ANTIALIAS)))
+                im.seek(i)
+        except EOFError:
+            pass
+
+        try:
+            self.delay = im.info['duration']
+        except:
+            self.delay = 100
+
+        if len(self.frames) == 1:
+            self.label.config(image=self.frames[0])
+        else:
+            self.next_frame()
+
+    def unload(self):
+        try:
+            self.label.config(image="")
+            self.frames = None
+        except _tkinter.TclError:
+            pass
+
+    def next_frame(self):
+        try:
+            if self.frames:
+                self.loc += 1
+                self.loc %= len(self.frames)
+                if not self.loc:
+                    self.loc = 1
+                self.label.config(image=self.frames[self.loc])
+                self.label.after(self.delay, self.next_frame)
+        except _tkinter.TclError:
+            pass
 
 
 class VideoRecorder:
@@ -164,22 +217,26 @@ class VideoRecorder:
         Saves the input from an audio source to specified file
         :return: None
         """
-        self.mic_thread_live = True
-        self.mic_data = []
-        while self.playing:
-            try:
-                if self.recording:
-                    self.mic_data.append(self.mic.read(self.mic_chunk))
-                else:
-                    time.sleep(0.01)
-            except Exception as e:
-                if self.recording:
-                    print(
-                        f"ERROR: Exception encountered in tkVideoUtils.VideoRecorder audio recording thread: {str(e)}")
-        if self.mic_data:
-            self.__save_audio_file(self.audio_output)
-        self.__close_mic_recorder()
-        self.mic_thread_live = False
+        try:
+            self.mic_thread_live = True
+            self.mic_data = []
+            while self.playing:
+                try:
+                    if self.recording:
+                        self.mic_data.append(self.mic.read(self.mic_chunk))
+                    else:
+                        time.sleep(0.01)
+                except Exception as e:
+                    if self.recording:
+                        print(
+                            f"ERROR: Exception encountered in tkVideoUtils.VideoRecorder audio recording thread: {str(e)}")
+            if self.mic_data:
+                self.__save_audio_file(self.audio_output)
+            self.__close_mic_recorder()
+            self.mic_thread_live = False
+        except Exception as e:
+            print(f"ERROR: __audio_recording_thread exiting due to {str(e)}")
+            return
 
     def __video_recording_thread(self):
         """
@@ -187,48 +244,56 @@ class VideoRecorder:
         is currently being viewed.
         :return: None
         """
-        self.cam_thread_live = True
-        while self.playing:
-            try:
-                start_time = time.time()
-                self.cam_frame = self.cam.get_next_data()
-                if self.recording:
-                    self.writer.append_data(self.cam_frame)
-                if self.recording:
-                    process_time = time.time() - start_time
-                else:
-                    process_time = 0
-                time.sleep((self.frame_duration - process_time) - time.monotonic() % self.frame_duration)
-            except Exception as e:
-                if self.recording:
-                    print(
-                        f"ERROR: Exception encountered in tkVideoUtils.VideoRecorder video recording thread: {str(e)}")
-        if self.writer:
-            self.writer.close()
-        self.cam.close()
-        self.cam_thread_live = False
+        try:
+            self.cam_thread_live = True
+            while self.playing:
+                try:
+                    start_time = time.time()
+                    self.cam_frame = self.cam.get_next_data()
+                    if self.recording:
+                        self.writer.append_data(self.cam_frame)
+                    if self.recording:
+                        process_time = time.time() - start_time
+                    else:
+                        process_time = 0
+                    time.sleep((self.frame_duration - process_time) - time.monotonic() % self.frame_duration)
+                except Exception as e:
+                    if self.recording:
+                        print(
+                            f"ERROR: Exception encountered in tkVideoUtils.VideoRecorder video recording thread: {str(e)}")
+            if self.writer:
+                self.writer.close()
+            self.cam.close()
+            self.cam_thread_live = False
+        except Exception as e:
+            print(f"ERROR: __video_recording_thread exiting due to {str(e)}")
+            return
 
     def __video_display_thread(self):
         """
         Thread that updates the video display label with the current frame
         :return: None
         """
-        last_image = None
-        while self.playing:
-            try:
-                if self.cam_frame is not None:
-                    if last_image is not None:
-                        if (last_image == self.cam_frame).all():
-                            continue
-                    if self.label.winfo_viewable():
-                        frame_image = ImageTk.PhotoImage(Image.fromarray(self.cam_frame).resize(self.size))
-                        self.label.config(image=frame_image)
-                        self.label.image = frame_image
-                    last_image = self.cam_frame
-            except Exception as e:
-                if self.recording:
-                    print(
-                        f"ERROR: Exception encountered in tkVideoUtils.VideoRecorder video recording thread: {str(e)}")
+        try:
+            last_image = None
+            while self.playing:
+                try:
+                    if self.cam_frame is not None:
+                        if last_image is not None:
+                            if (last_image == self.cam_frame).all():
+                                continue
+                        if self.label.winfo_viewable():
+                            frame_image = ImageTk.PhotoImage(Image.fromarray(self.cam_frame).resize(self.size))
+                            self.label.config(image=frame_image)
+                            self.label.image = frame_image
+                        last_image = self.cam_frame
+                except Exception as e:
+                    if self.recording:
+                        print(
+                            f"ERROR: Exception encountered in tkVideoUtils.VideoRecorder video recording thread: {str(e)}")
+        except Exception as e:
+            print(f"ERROR: __video_display_thread exiting due to {str(e)}")
+            return
 
     def merge_sources(self, output, ffmpeg_path, overwrite='-y', delete_file=True):
         """
@@ -319,14 +384,15 @@ class VideoPlayer:
     Class that handles the streaming of a video file from the filesystem to a Label.
     """
 
-    def __init__(self, root, video_path, audio_path, label, size=(640, 360), play_button=None, play_image=None,
-                 pause_image=None, slider=None, slider_var=None, keep_ratio=False, skip_size_s=1,
+    def __init__(self, root, video_path, audio_path, label, loading_gif, size=(640, 360), play_button=None,
+                 play_image=None, pause_image=None, slider=None, slider_var=None, keep_ratio=False, skip_size_s=1,
                  override_slider=False, cleanup_audio=False):
         """
         Streams a video on the filesystem to a tkinter Label.
         :param video_path: path-like: Absolute path to the video file to be streamed
         :param audio_path: path-like: Absolute path to the audio file to be streamed
         :param label: Tk Label: The Label that will stream the video
+        :param loading_gif: path-like: The gif to be used for the loading animation
         :param size: tuple: The size of the video on the Tk Label.
         :param play_button: Tk Button: Pass in a Button that will be wired up to control the play/pause of the video
         :param play_image: PhotoImage: The image that will be on the play_button if the video is paused
@@ -339,16 +405,40 @@ class VideoPlayer:
         :param cleanup_audio: bool: Set to have separated audio track deleted after it's been loaded
         """
         self.root = root
+        self.setup_streams(video_path, audio_path, label, loading_gif, size, play_button, play_image,
+                           pause_image, slider, slider_var, keep_ratio, skip_size_s,
+                           override_slider, cleanup_audio)
+
+    def setup_streams(self, video_path, audio_path, label, loading_gif, size=(640, 360), play_button=None, play_image=None,
+                      pause_image=None, slider=None, slider_var=None, keep_ratio=False, skip_size_s=1,
+                      override_slider=False, cleanup_audio=False):
+        """
+        Streams a video on the filesystem to a tkinter Label.
+        :param video_path: path-like: Absolute path to the video file to be streamed
+        :param audio_path: path-like: Absolute path to the audio file to be streamed
+        :param label: Tk Label: The Label that will stream the video
+        :param loading_gif: path-like: The gif to be used for the loading animation
+        :param size: tuple: The size of the video on the Tk Label.
+        :param play_button: Tk Button: Pass in a Button that will be wired up to control the play/pause of the video
+        :param play_image: PhotoImage: The image that will be on the play_button if the video is paused
+        :param pause_image: PhotoImage: The image that will be on the play_button if the video is playing
+        :param slider: Tk Slider: Pass in a Slider that will be wired up to control the loaded frame
+        :param slider_var: Tk IntVar: Control variable that can be used to monitor the frame index
+        :param keep_ratio: bool: If True, the source aspect ratio will be kept
+        :param skip_size_s: int: The number of seconds the video should skip when skipped forward or backward
+        :param override_slider: bool: Set to true if you want to configure an external callback for the Slider
+        :param cleanup_audio: bool: Set to have separated audio track deleted after it's been loaded
+        """
         self.video_path = video_path
         self.audio_path = audio_path
         self.audio_index = 0
         self.play_audio = False
         self.audio_chunk = 1024
         self.cleanup_audio = False
+        self.loading_gif = loading_gif
         if not os.path.exists(self.audio_path):
             temp_audioclip = AudioFileClip(self.video_path)
             if len(temp_audioclip.reader.buffer):
-                temp_audioclip.write_audiofile(self.audio_path, codec='pcm_s16le')
                 self.audio_loaded = True
             else:
                 self.audio_loaded = False
@@ -372,11 +462,14 @@ class VideoPlayer:
         self.clip_frame = None
         if keep_ratio:
             self.aspect_ratio = float(self.raw_size[1]) / float(self.raw_size[0])
-            self.size = (size[0], int(size[0] / self.aspect_ratio))
+            self.size = (int(size[1] * self.aspect_ratio), size[1])
         else:
             self.size = size
 
-        self.slider = slider
+        new_slider = False
+        if slider:
+            self.slider = slider
+            new_slider = True
         self.slider_var = slider_var
         self.override_slider = override_slider
         if self.slider:
@@ -388,10 +481,11 @@ class VideoPlayer:
                 self.slider_var = slider_var
                 self.slider_var.set(1)
             elif type(self.slider) == TickScale:
-                self.trough_img = tk.PhotoImage('img_trough', width=size[0], height=10, master=self.root)
+                if new_slider:
+                    self.trough_img = tk.PhotoImage(width=size[0], height=10, master=self.root)
+                    style_name = self.__create_slider_style()
+                    self.slider.configure(style=style_name)
                 self.set_img_color(self.trough_img, ['white', 'red'], [size[0], 0])
-                style_name = self.__create_slider_style()
-                self.slider.configure(style=style_name)
                 self.slider.configure(from_=1, to=int(self.nframes))
                 self.slider.configure(length=size[0])
                 self.slider.configure(resolution=1)
@@ -402,24 +496,21 @@ class VideoPlayer:
         self.pause_image = pause_image
         if self.play_button:
             self.play_button.config(image=self.play_image, command=self.toggle_video)
-        self.load_frame_index = 0
-        self.loading = True
         meta_data.release()
-        self.frames = [None] * self.nframes
+
+        self.load_video_thread_live = False
+        self.video_thread_live = False
+        self.audio_thread_live = False
+        self.frames = []
+        self.loading = False
+        self.load_frame_index = 0
         self.load_thread = threading.Thread(target=self.__load_video)
         self.load_thread.daemon = True
         self.load_thread.start()
-        self.video_thread_live = False
         if self.audio_loaded:
-            self.audio_file = wave.open(self.audio_path, 'rb')
-            self.start_stream()
-            self.stream_attr = self.get_wav_attr(self.audio_file)
-            self.audio_data = [None] * int(self.stream_attr["nframes"] / self.audio_chunk)
-            self.audio_loading = True
             self.audio_load_thread = threading.Thread(target=self.__load_audio_thread)
             self.audio_load_thread.daemon = True
             self.audio_load_thread.start()
-        self.audio_thread_live = False
 
     def start_stream(self):
         """
@@ -514,6 +605,10 @@ class VideoPlayer:
             self.style.configure('custom.Horizontal.TScale', background=fig_color)
         except _tkinter.TclError:
             print("INFO: Style already exists!")
+            try:
+                self.style.element_create('Horizontal.Scale.trough', 'image', self.trough_img)
+            except _tkinter.TclError:
+                return 'custom.Horizontal.TScale'
             return 'custom.Horizontal.TScale'
         return 'custom.Horizontal.TScale'
 
@@ -522,28 +617,47 @@ class VideoPlayer:
         Background thread to load in frames to prevent issues when playing
         :return: None
         """
-        self.load_frame_index = 0
-        last_image = None
-        frame_data = imageio.get_reader(self.video_path)
-        for image in frame_data.iter_data():
-            try:
-                if last_image is not None:
-                    if (last_image == image).all():
-                        continue
-                self.frames[self.load_frame_index] = (ImageTk.PhotoImage(Image.fromarray(image).resize(self.size)))
-                last_image = image
-                if self.load_frame_index == 1:
-                    self.load_frame(1)
-                if self.load_frame_index % 10:
-                    if self.slider:
-                        if type(self.slider) == TickScale:
-                            self.__update_loading_slider()
-                self.load_frame_index += 1
+        try:
+            self.loading = True
+            self.load_video_thread_live = True
+            self.load_frame_index = 0
+            last_image = None
+            size = self.size
+            frame_data = imageio.get_reader(self.video_path)
+            for image in frame_data.iter_data():
                 if not self.loading:
-                    break
-            except IndexError as e:
-                break
-        self.__clear_loading_slider()
+                    self.load_video_thread_live = False
+                    return
+                if image is not None:
+                    try:
+                        if last_image is not None:
+                            if (last_image == image).all():
+                                continue
+                        resized_image = ImageTk.PhotoImage(Image.fromarray(image).resize(size))
+                        self.frames.append(resized_image)
+                        self.load_frame_index += 1
+                        last_image = image
+                        if not self.audio_loaded:
+                            if self.load_frame_index == 1:
+                                self.load_frame(1)
+                        if self.load_frame_index % 10:
+                            if self.slider:
+                                if type(self.slider) == TickScale and self.loading:
+                                    self.__update_loading_slider()
+                                else:
+                                    self.load_video_thread_live = False
+                                    return
+                    except IndexError as e:
+                        self.load_video_thread_live = False
+                        return
+                    except Exception as e:
+                        self.load_video_thread_live = False
+                        return
+            self.load_video_thread_live = False
+            self.__clear_loading_slider()
+        except Exception as e:
+            print(f"ERROR: __load_video exiting due to {str(e)}")
+            return
 
     def play_video(self):
         """
@@ -678,42 +792,60 @@ class VideoPlayer:
         Loads in wav file for usage in audio playback thread, closes audio file once completed
         :return: None
         """
-        self.audio_data = []
-        while True:
-            if self.audio_loading:
-                data = self.audio_file.readframes(self.audio_chunk)
-                if data != b'':
-                    self.audio_data.append(data)
+        try:
+            loading_gif = ImageLabel(self.loading_gif, self.label, (self.size[1], self.size[1]))
+            temp_audioclip = AudioFileClip(self.video_path)
+            temp_audioclip.write_audiofile(self.audio_path, codec='pcm_s16le', verbose=False, logger=None)
+            loading_gif.unload()
+            self.load_frame(1)
+            self.audio_file = wave.open(self.audio_path, 'rb')
+            self.start_stream()
+            self.stream_attr = self.get_wav_attr(self.audio_file)
+            self.audio_data = [None] * int(self.stream_attr["nframes"] / self.audio_chunk)
+            self.audio_loading = True
+            self.audio_data = []
+            while True:
+                if self.audio_loading:
+                    data = self.audio_file.readframes(self.audio_chunk)
+                    if data != b'':
+                        self.audio_data.append(data)
+                    else:
+                        break
                 else:
                     break
-            else:
-                break
-        self.audio_file.close()
-        self.audio_loading = False
-        if self.cleanup_audio:
-            os.remove(self.audio_path)
+            self.audio_file.close()
+            self.audio_loading = False
+            if self.cleanup_audio:
+                os.remove(self.audio_path)
+        except Exception as e:
+            print(f"ERROR: __load_audio_thread exiting due to {str(e)}")
+            return
 
     def __audio_thread(self):
         """
         Writes the current audio_index to the output stream
         :return: None
         """
-        self.audio_thread_live = True
         try:
-            while (self.audio_index < len(self.audio_data) - 1) and self.playing:
-                if self.play_audio:
-                    if self.playing:
-                        self.stream.write(self.audio_data[self.audio_index])
-                        self.audio_index += 1
+            self.audio_thread_live = True
+            try:
+                while (self.audio_index < len(self.audio_data) - 1) and self.playing:
+                    if self.play_audio:
+                        if self.playing:
+                            self.stream.write(self.audio_data[self.audio_index])
+                            self.audio_index += 1
+                        else:
+                            break
                     else:
-                        break
-                else:
-                    time.sleep(0.001)
-            self.play_audio = False
-            self.stop_stream()
-            self.audio_thread_live = False
+                        time.sleep(0.001)
+                self.play_audio = False
+                self.stop_stream()
+                self.audio_thread_live = False
+            except Exception as e:
+                print(str(e), traceback.print_exc())
         except Exception as e:
-            print(str(e), traceback.print_exc())
+            print(f"ERROR: __audio_thread exiting due to {str(e)}")
+            return
 
     def __update_audio_index(self):
         """
@@ -721,68 +853,72 @@ class VideoPlayer:
         :return: None
         """
         if self.audio_loaded:
-            self.audio_index = int((len(self.audio_data) * self.current_frame) / len(self.frames))
+            self.audio_index = int((len(self.audio_data) * self.current_frame) / self.nframes)
 
     def __playing_thread(self):
         """
         Thread that will stream the video file to a Label at the source frame rate.
         :return: None
         """
-        self.video_thread_live = True
-        n = self.nframes
-        i = int(self.current_frame)
-        self.playing = True
-        self.__update_audio_index()
-        self.play_audio = True
-        while i < n:
-            if not self.playing:
-                break
-            try:
-                if i < self.load_frame_index:
-                    im = self.frames[i]
-                    self.current_frame = i
-                    if self.label.winfo_viewable():
-                        frame_image = im
-                        self.label.config(image=frame_image)
-                        self.label.image = frame_image
-                    if self.override_slider:
-                        if self.slider:
-                            # Trigger callback each time a frame is loaded
-                            self.slider.set(i)
-                    else:
-                        if self.slider_var:
-                            self.slider_var.set(i)
-                    if self.start_frame and self.clip_frame:
-                        if not (self.start_frame <= i < self.clip_frame):
-                            break
-                    if self.skip_forward:
-                        i += int(self.skip_size * self.fps)
-                        self.skip_forward = False
-                    elif self.skip_backward:
-                        i -= int(self.skip_size * self.fps)
-                        self.skip_backward = False
-                    else:
-                        i += 1
-                    time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
-                else:
-                    i = self.load_frame_index - 1
-            except StopIteration as e:
-                print(str(e))
-                break
-            except IndexError as e:
-                print(str(e))
-                self.playing = False
-                if n == float("inf"):
+        try:
+            self.video_thread_live = True
+            n = self.nframes
+            i = int(self.current_frame)
+            self.playing = True
+            self.__update_audio_index()
+            self.play_audio = True
+            while i < n:
+                if not self.playing:
                     break
-                raise
-        self.video_thread_live = False
-        time.sleep(0.01)
-        self.playing = False
-        self.play_audio = False
-        if self.current_frame > self.nframes:
-            self.current_frame = self.nframes
-        if self.play_button:
-            self.play_button.config(image=self.play_image)
+                try:
+                    if i < self.load_frame_index:
+                        im = self.frames[i]
+                        self.current_frame = i
+                        if self.label.winfo_viewable():
+                            frame_image = im
+                            self.label.config(image=frame_image)
+                            self.label.image = frame_image
+                        if self.override_slider:
+                            if self.slider:
+                                # Trigger callback each time a frame is loaded
+                                self.slider.set(i)
+                        else:
+                            if self.slider_var:
+                                self.slider_var.set(i)
+                        if self.start_frame and self.clip_frame:
+                            if not (self.start_frame <= i < self.clip_frame):
+                                break
+                        if self.skip_forward:
+                            i += int(self.skip_size * self.fps)
+                            self.skip_forward = False
+                        elif self.skip_backward:
+                            i -= int(self.skip_size * self.fps)
+                            self.skip_backward = False
+                        else:
+                            i += 1
+                        time.sleep(self.frame_duration - time.monotonic() % self.frame_duration)
+                    else:
+                        i = self.load_frame_index - 1
+                except StopIteration as e:
+                    print(str(e))
+                    break
+                except IndexError as e:
+                    print(str(e))
+                    self.playing = False
+                    if n == float("inf"):
+                        break
+                    raise
+            self.video_thread_live = False
+            time.sleep(0.01)
+            self.playing = False
+            self.play_audio = False
+            if self.current_frame > self.nframes:
+                self.current_frame = self.nframes
+            if self.play_button:
+                self.play_button.config(image=self.play_image)
+        except Exception as e:
+            print(f"ERROR: __playing_thread exiting due to {str(e)}")
+            return
 
     def play(self):
         """
@@ -803,6 +939,10 @@ class VideoPlayer:
             audio_thread.start()
 
     def close(self):
+        """
+        Cleans up resources and sets flags to end running threads.
+        :return: None
+        """
         self.loading = False
         self.playing = False
         self.audio_loading = False

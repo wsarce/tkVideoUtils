@@ -1,1 +1,1 @@
-from .tkvideoutils import VideoPlayer, VideoRecorder, cp_rename
+from .tkvideoutils import VideoPlayer, VideoRecorder, cp_rename, ImageLabel

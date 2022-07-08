@@ -3,11 +3,11 @@ from tkinter import *
 from ttkwidgets import TickScale
 
 from tkvideoutils import VideoPlayer
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 
 
 def on_closing():
-    player.loading = False
+    player.close()
     root.quit()
     root.destroy()
 
@@ -42,7 +42,8 @@ if __name__ == '__main__':
         # read video to display on label
         player = VideoPlayer(root, video_path, audio_path, video_label, size=(700, 500),
                              play_button=button, play_image=play_image, pause_image=pause_image,
-                             slider=slider, slider_var=slider_var, keep_ratio=True, cleanup_audio=True)
+                             slider=slider, slider_var=slider_var, keep_ratio=True, cleanup_audio=True,
+                             loading_gif=r'C:\GitHub\tkVideoUtils\examples\loading.gif')
     else:
         messagebox.showwarning("Select Video File", "Please retry and select a video file.")
         sys.exit(1)
