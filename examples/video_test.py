@@ -47,7 +47,7 @@ if __name__ == '__main__':
     else:
         messagebox.showwarning("Select Video File", "Please retry and select a video file.")
         sys.exit(1)
-    player.set_clip(50, 70)
+    player.set_clip(0, 20)
     forward_button.config(command=player.skip_video_forward)
     backward_button.config(command=player.skip_video_backward)
     root.protocol("WM_DELETE_WINDOW", on_closing)

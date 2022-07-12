@@ -885,7 +885,7 @@ class VideoPlayer:
                         else:
                             if self.slider_var:
                                 self.slider_var.set(i)
-                        if self.start_frame and self.clip_frame:
+                        if self.start_frame is not None and self.clip_frame is not None:
                             if not (self.start_frame <= i < self.clip_frame):
                                 break
                         if self.skip_forward:
@@ -928,7 +928,7 @@ class VideoPlayer:
         self.playing = True
         if self.current_frame == self.nframes - 1:
             self.current_frame = 0
-        if self.start_frame:
+        if self.start_frame is not None:
             self.current_frame = self.start_frame
         video_thread = threading.Thread(target=self.__playing_thread)
         video_thread.daemon = True
