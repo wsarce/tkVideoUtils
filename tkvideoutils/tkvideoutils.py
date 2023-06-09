@@ -86,7 +86,7 @@ class VideoRecorder:
     """
 
     def __init__(self, video_source, audio_source, video_path, audio_path, fps, label, size=(640, 360),
-                 keep_ratio=True):
+                 keep_ratio=True, keep_playing=False):
         """
         Streams, records, and handles webcam feeds
         :param video_source: tuple: Use VideoRecorder.get_video_sources() to get compatible sources
@@ -99,6 +99,7 @@ class VideoRecorder:
         :param keep_ratio: bool: If true, the aspect ratio is kept for the video
         """
         self.fps = fps
+        self.keep_playing = keep_playing
         self.frame_duration = float(1 / self.fps)
         self.label = label
         if video_path:
@@ -256,7 +257,9 @@ class VideoRecorder:
                         process_time = time.time() - start_time
                     else:
                         process_time = 0
-                    time.sleep((self.frame_duration - process_time) - time.monotonic() % self.frame_duration)
+                    sleep_time = (self.frame_duration - process_time) - time.monotonic() % self.frame_duration
+                    if sleep_time >= 0:
+                        time.sleep((self.frame_duration - process_time) - time.monotonic() % self.frame_duration)
                 except Exception as e:
                     if self.recording:
                         print(
@@ -268,6 +271,16 @@ class VideoRecorder:
         except Exception as e:
             print(f"ERROR: __video_recording_thread exiting due to {str(e)}")
             return
+
+    def close_video_recording(self):
+        """
+        Handles the recording objects so the playback stream doesn't have to end.
+        :return: None
+        """
+        if self.writer:
+            self.writer.close()
+        if self.mic_data:
+            self.__save_audio_file(self.audio_output)
 
     def __video_display_thread(self):
         """
@@ -304,8 +317,9 @@ class VideoRecorder:
         :param overwrite: string: -y to overwrite (default) or -n to not overwrite
         :return: bool: True if successful, False if unsuccessful
         """
-        while self.mic_thread_live or self.cam_thread_live:
-            time.sleep(0.01)
+        if not self.keep_playing:
+            while self.mic_thread_live or self.cam_thread_live:
+                time.sleep(0.01)
         try:
             ff = ffmpy.FFmpeg(
                 executable=ffmpeg_path,
