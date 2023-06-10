@@ -116,6 +116,8 @@ class VideoRecorder:
         self.playing = False
         self.cam = None
         self.cam_frame = None
+        self.new_frame = False
+        self.write_video = False
         self.cam_thread_live = False
         self.mic = None
         self.mic_data = []
@@ -251,15 +253,20 @@ class VideoRecorder:
                 try:
                     start_time = time.time()
                     self.cam_frame = self.cam.get_next_data()
-                    if self.recording:
+                    self.new_frame = True
+
+                    self.write_video = True
+                    if self.recording and not self.writer.closed:
                         self.writer.append_data(self.cam_frame)
+                    self.write_video = False
+
                     if self.recording:
                         process_time = time.time() - start_time
                     else:
                         process_time = 0
                     sleep_time = (self.frame_duration - process_time) - time.monotonic() % self.frame_duration
                     if sleep_time >= 0:
-                        time.sleep((self.frame_duration - process_time) - time.monotonic() % self.frame_duration)
+                        time.sleep(sleep_time)
                 except Exception as e:
                     if self.recording:
                         print(
@@ -277,10 +284,13 @@ class VideoRecorder:
         Handles the recording objects so the playback stream doesn't have to end.
         :return: None
         """
+        while self.write_video:
+            continue
         if self.writer:
             self.writer.close()
         if self.mic_data:
             self.__save_audio_file(self.audio_output)
+            self.mic_data = []
 
     def __video_display_thread(self):
         """
@@ -293,7 +303,7 @@ class VideoRecorder:
                 try:
                     if self.cam_frame is not None:
                         if last_image is not None:
-                            if (last_image == self.cam_frame).all():
+                            while not self.new_frame:
                                 continue
                         if self.label.winfo_viewable():
                             frame_image = ImageTk.PhotoImage(Image.fromarray(self.cam_frame).resize(self.size))
