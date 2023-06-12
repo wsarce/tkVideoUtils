@@ -97,6 +97,7 @@ class VideoRecorder:
         :param label: Tk Label: The Label that will be used to display the video
         :param size: tuple: The height and width of the video on the Label
         :param keep_ratio: bool: If true, the aspect ratio is kept for the video
+        :param keep_playing: bool: If true, the VideoRecorder will continue to show the webcam view
         """
         self.fps = fps
         self.keep_playing = keep_playing
@@ -410,7 +411,7 @@ class VideoPlayer:
 
     def __init__(self, root, video_path, audio_path, label, loading_gif, size=(640, 360), play_button=None,
                  play_image=None, pause_image=None, slider=None, slider_var=None, keep_ratio=False, skip_size_s=1,
-                 override_slider=False, cleanup_audio=False):
+                 override_slider=False, cleanup_audio=False, auto_play=False):
         """
         Streams a video on the filesystem to a tkinter Label.
         :param video_path: path-like: Absolute path to the video file to be streamed
@@ -427,15 +428,16 @@ class VideoPlayer:
         :param skip_size_s: int: The number of seconds the video should skip when skipped forward or backward
         :param override_slider: bool: Set to true if you want to configure an external callback for the Slider
         :param cleanup_audio: bool: Set to have separated audio track deleted after it's been loaded
+        :param auto_play: bool: Set to have the loaded video automatically start playing
         """
         self.root = root
         self.setup_streams(video_path, audio_path, label, loading_gif, size, play_button, play_image,
                            pause_image, slider, slider_var, keep_ratio, skip_size_s,
-                           override_slider, cleanup_audio)
+                           override_slider, cleanup_audio, auto_play)
 
     def setup_streams(self, video_path, audio_path, label, loading_gif, size=(640, 360), play_button=None, play_image=None,
                       pause_image=None, slider=None, slider_var=None, keep_ratio=False, skip_size_s=1,
-                      override_slider=False, cleanup_audio=False):
+                      override_slider=False, cleanup_audio=False, auto_play=False):
         """
         Streams a video on the filesystem to a tkinter Label.
         :param video_path: path-like: Absolute path to the video file to be streamed
@@ -452,6 +454,7 @@ class VideoPlayer:
         :param skip_size_s: int: The number of seconds the video should skip when skipped forward or backward
         :param override_slider: bool: Set to true if you want to configure an external callback for the Slider
         :param cleanup_audio: bool: Set to have separated audio track deleted after it's been loaded
+        :param auto_play: bool: Set to have the loaded video automatically start playing
         """
         self.video_path = video_path
         self.audio_path = audio_path
@@ -471,6 +474,7 @@ class VideoPlayer:
         else:
             self.audio_loaded = True
         self.label = label
+        self.auto_play = auto_play
         self.playing = False
         self.skip_forward, self.skip_backward = False, False
         self.skip_size = skip_size_s
@@ -671,6 +675,9 @@ class VideoPlayer:
                                 else:
                                     self.load_video_thread_live = False
                                     return
+                        if self.auto_play:
+                            if not self.audio_loaded:
+                                self.play()
                     except IndexError as e:
                         self.load_video_thread_live = False
                         return
@@ -825,9 +832,9 @@ class VideoPlayer:
             self.audio_file = wave.open(self.audio_path, 'rb')
             self.start_stream()
             self.stream_attr = self.get_wav_attr(self.audio_file)
-            self.audio_data = [None] * int(self.stream_attr["nframes"] / self.audio_chunk)
             self.audio_loading = True
             self.audio_data = []
+
             while True:
                 if self.audio_loading:
                     data = self.audio_file.readframes(self.audio_chunk)
@@ -839,6 +846,8 @@ class VideoPlayer:
                     break
             self.audio_file.close()
             self.audio_loading = False
+            if self.auto_play:
+                self.play()
             if self.cleanup_audio:
                 os.remove(self.audio_path)
         except Exception as e:
