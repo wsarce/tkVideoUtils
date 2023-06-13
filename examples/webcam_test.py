@@ -49,7 +49,7 @@ if __name__ == '__main__':
         if video_path:
             # read video to display on label
             player = VideoRecorder(video_source=video_sources[0], audio_source=audio_sources[1],
-                                   video_path=video_path, audio_path=audio_path, fps=8, label=video_label,
+                                   video_path=video_path, audio_path=audio_path, fps=30, label=video_label,
                                    size=(700, 500))
             player.start_playback()
         else:

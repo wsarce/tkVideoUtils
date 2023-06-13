@@ -43,7 +43,8 @@ if __name__ == '__main__':
         player = VideoPlayer(root, video_path, audio_path, video_label, size=(700, 500),
                              play_button=button, play_image=play_image, pause_image=pause_image,
                              slider=slider, slider_var=slider_var, keep_ratio=True, cleanup_audio=True,
-                             loading_gif=r'C:\GitHub\tkVideoUtils\examples\loading.gif')
+                             loading_gif=r'C:\GitHub\tkVideoUtils\examples\loading.gif',
+                             auto_play=True)
     else:
         messagebox.showwarning("Select Video File", "Please retry and select a video file.")
         sys.exit(1)
